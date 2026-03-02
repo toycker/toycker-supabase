@@ -7,6 +7,89 @@ import { SortOptions } from "@modules/store/components/refinement-list/types"
 
 import { normalizeProductImage } from "@lib/util/images"
 
+type QueryError = {
+  message?: string
+  code?: string
+  status?: number
+}
+
+const RETRY_ATTEMPTS = 3
+const RETRY_BASE_DELAY_MS = 400
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+
+function toQueryError(error: unknown): QueryError | null {
+  if (!error || typeof error !== "object") return null
+
+  const record = error as Record<string, unknown>
+
+  return {
+    message: typeof record.message === "string" ? record.message : undefined,
+    code: typeof record.code === "string" ? record.code : undefined,
+    status: typeof record.status === "number" ? record.status : undefined,
+  }
+}
+
+function isTransientUpstreamError(error: unknown): boolean {
+  const parsedError = toQueryError(error)
+  if (!parsedError) return false
+
+  const rawMessage = parsedError.message ?? ""
+  const message = rawMessage.toLowerCase()
+  const status = parsedError.status ?? null
+
+  if (status === 502 || status === 503 || status === 504) {
+    return true
+  }
+
+  return (
+    message.includes("502") ||
+    message.includes("503") ||
+    message.includes("504") ||
+    message.includes("bad gateway") ||
+    message.includes("cloudflare") ||
+    message.includes("fetch failed") ||
+    message.includes("failed to fetch") ||
+    message.includes("timeout")
+  )
+}
+
+async function runProductQueryWithRetry<T extends { error: unknown }>(
+  execute: () => PromiseLike<T>,
+  operationName: string
+): Promise<T> {
+  let lastResult: T | null = null
+
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    const result = await execute()
+    lastResult = result
+
+    if (!result.error) {
+      return result
+    }
+
+    const shouldRetry = isTransientUpstreamError(result.error) && attempt < RETRY_ATTEMPTS
+    if (!shouldRetry) {
+      break
+    }
+
+    const delay = RETRY_BASE_DELAY_MS * attempt
+    console.warn(
+      `${operationName} transient upstream error on attempt ${attempt}/${RETRY_ATTEMPTS}; retrying in ${delay}ms`
+    )
+    await sleep(delay)
+  }
+
+  if (lastResult) {
+    return lastResult
+  }
+
+  throw new Error(`${operationName} failed without result`)
+}
+
 const PRODUCT_SELECT = `
   *, 
   variants:product_variants(*), 
@@ -67,7 +150,10 @@ export const listProducts = cache(async function listProducts(options: {
     query = query.limit(options.queryParams.limit)
   }
 
-  const { data, count, error } = await query.order("created_at", { ascending: false })
+  const { data, count, error } = await runProductQueryWithRetry(
+    () => query.order("created_at", { ascending: false }),
+    "listProducts"
+  )
 
   if (error) {
     console.error("Error listing products:", error.message)
@@ -196,9 +282,13 @@ export const listPaginatedProducts = cache(async function listPaginatedProducts(
   // If we have a price filter, we must fetch everything to find matches and then paginate manually
   const needsClientSideFiltering = priceFilter?.min !== undefined || priceFilter?.max !== undefined
 
-  const { data, count, error } = needsClientSideFiltering
-    ? await query // Fetch everything if we need to filter client-side
-    : await query.range(offset, offset + limit - 1)
+  const { data, count, error } = await runProductQueryWithRetry(
+    () =>
+      needsClientSideFiltering
+        ? query
+        : query.range(offset, offset + limit - 1),
+    "listPaginatedProducts"
+  )
 
   if (error) {
     return { response: { products: [], count: 0 }, pagination: { page, limit } }
