@@ -6,7 +6,12 @@ import { sendOtp, verifyOtp } from "@lib/data/otp"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import Input from "@modules/common/components/input"
 
-const PhoneLogin = () => {
+type Props = {
+  next?: string
+  returnUrl?: string
+}
+
+const PhoneLogin = ({ next, returnUrl }: Props) => {
   const { showToast } = useToast()
   const [phone, setPhone] = useState("")
   const [otpSent, setOtpSent] = useState(false)
@@ -16,16 +21,23 @@ const PhoneLogin = () => {
   const [sendState, sendAction, isSending] = useActionState(sendOtp, null)
   const [verifyState, verifyAction, isVerifying] = useActionState(verifyOtp, null)
 
-  // Start cooldown timer
-  const startCooldown = useCallback(() => {
-    setResendCooldown(60)
-    if (timerRef.current) clearInterval(timerRef.current)
+  const startCooldown = useCallback((durationSeconds: number) => {
+    setResendCooldown(durationSeconds)
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+
     timerRef.current = setInterval(() => {
       setResendCooldown((prev) => {
         if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current)
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+          }
+
           return 0
         }
+
         return prev - 1
       })
     }, 1000)
@@ -33,34 +45,49 @@ const PhoneLogin = () => {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
     }
   }, [])
 
-  // Handle send OTP result
   useEffect(() => {
     if (!sendState) return
+
     if (sendState.success) {
       setOtpSent(true)
-      startCooldown()
+      startCooldown(sendState.data.cooldownSeconds)
       showToast("OTP sent to your WhatsApp", "success")
-    } else if (sendState.error) {
-      showToast(sendState.error, "error")
+      return
     }
+
+    showToast(sendState.error, "error")
   }, [sendState, showToast, startCooldown])
 
-  // Handle verify OTP result (errors only — success redirects server-side)
   useEffect(() => {
-    if (!verifyState) return
-    if (!verifyState.success && verifyState.error) {
-      showToast(verifyState.error, "error")
-    }
+    if (!verifyState || verifyState.success) return
+    showToast(verifyState.error, "error")
   }, [verifyState, showToast])
+
+  const appendRedirectFields = useCallback(
+    (formData: FormData) => {
+      if (returnUrl) {
+        formData.append("returnUrl", returnUrl)
+      }
+
+      if (next) {
+        formData.append("next", next)
+      }
+    },
+    [next, returnUrl]
+  )
 
   const handleResend = () => {
     if (resendCooldown > 0) return
+
     const formData = new FormData()
     formData.append("phone", phone)
+    appendRedirectFields(formData)
     sendAction(formData)
   }
 
@@ -68,9 +95,13 @@ const PhoneLogin = () => {
     return (
       <div className="w-full flex flex-col gap-y-6" data-testid="phone-login">
         <form className="w-full flex flex-col" action={sendAction}>
+          <input type="hidden" name="returnUrl" value={returnUrl || ""} />
+          <input type="hidden" name="next" value={next || ""} />
           <div className="flex flex-col w-full gap-y-3">
             <div className="flex items-center gap-x-2">
-              <span className="text-sm text-ui-fg-subtle font-medium whitespace-nowrap pt-2">+91</span>
+              <span className="text-sm text-ui-fg-subtle font-medium whitespace-nowrap pt-2">
+                +91
+              </span>
               <Input
                 label="WhatsApp Number"
                 name="phone"
@@ -82,7 +113,9 @@ const PhoneLogin = () => {
                 disabled={isSending}
                 autoComplete="tel-national"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onChange={(e) =>
+                  setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                }
                 data-testid="phone-input"
               />
             </div>
@@ -102,10 +135,13 @@ const PhoneLogin = () => {
   return (
     <div className="w-full flex flex-col gap-y-6" data-testid="otp-verify">
       <p className="text-sm text-ui-fg-subtle text-center">
-        Code sent to <span className="font-medium text-ui-fg-base">+91 {phone}</span>
+        Code sent to{" "}
+        <span className="font-medium text-ui-fg-base">+91 {phone}</span>
       </p>
       <form className="w-full flex flex-col" action={verifyAction}>
         <input type="hidden" name="phone" value={phone} />
+        <input type="hidden" name="returnUrl" value={returnUrl || ""} />
+        <input type="hidden" name="next" value={next || ""} />
         <div className="flex flex-col w-full gap-y-3">
           <Input
             label="6-digit OTP"

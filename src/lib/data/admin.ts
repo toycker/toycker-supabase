@@ -32,7 +32,7 @@ export async function ensureAdmin() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/login?next=/admin")
+    redirect("/login?returnUrl=/admin")
   }
 
   const { data: profile } = await supabase

@@ -8,6 +8,20 @@ import { redirect } from "next/navigation"
 import { removeCartId } from "./cookies"
 import { CustomerProfile, Address } from "@/lib/supabase/types"
 
+const DEFAULT_WHATSAPP_LOGIN_EMAIL_DOMAIN = "wa.toycker.store"
+
+function isSyntheticWhatsAppEmail(email: string | null | undefined): boolean {
+  if (!email) {
+    return false
+  }
+
+  const emailDomain =
+    process.env.WHATSAPP_LOGIN_EMAIL_DOMAIN?.trim() ||
+    DEFAULT_WHATSAPP_LOGIN_EMAIL_DOMAIN
+
+  return email.endsWith(`@${emailDomain}`)
+}
+
 export const retrieveCustomer = cache(
   async (): Promise<CustomerProfile | null> => {
     const user = await getAuthUser()
@@ -32,7 +46,7 @@ export const retrieveCustomer = cache(
 
     return {
       id: user.id,
-      email: user.email!,
+      email: isSyntheticWhatsAppEmail(user.email) ? "" : user.email!,
       first_name: user.user_metadata?.first_name || profile?.first_name || "",
       last_name: user.user_metadata?.last_name || profile?.last_name || "",
       phone:

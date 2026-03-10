@@ -8,11 +8,17 @@ export const metadata: Metadata = {
 
 type Props = {
   searchParams: Promise<{
+    next?: string
     returnUrl?: string
   }>
 }
 
 export default async function Login(props: Props) {
   const searchParams = await props.searchParams
-  return <LoginTemplate returnUrl={searchParams.returnUrl} />
+  return (
+    <LoginTemplate
+      next={searchParams.next}
+      returnUrl={searchParams.returnUrl}
+    />
+  )
 }

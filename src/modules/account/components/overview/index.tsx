@@ -15,12 +15,16 @@ const Overview = ({ customer, orders, reviewsCount = 0 }: OverviewProps) => {
         <div className="text-xl-semi" data-testid="welcome-message" data-value={customer?.first_name}>
           Hello {customer?.first_name}
         </div>
-        <p className="text-sm text-gray-500">
-          Signed in as: {" "}
-          <span className="font-semibold text-gray-900" data-testid="customer-email" data-value={customer?.email}>
-            {customer?.email}
-          </span>
-        </p>
+        {customer?.email ? (
+          <p className="text-sm text-gray-500">
+            Signed in as:{" "}
+            <span className="font-semibold text-gray-900" data-testid="customer-email" data-value={customer?.email}>
+              {customer?.email}
+            </span>
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500">Signed in with your WhatsApp number.</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 small:grid-cols-4 gap-4">

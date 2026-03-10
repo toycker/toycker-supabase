@@ -14,12 +14,14 @@ const ProfileEmail: React.FC<MyInformationProps> = ({ customer }) => {
     <div className="w-full" data-testid="account-email-editor">
       <AccountInfo
         label="Email"
-        currentInfo={`${customer.email}`}
+        currentInfo={customer.email || "No email added"}
         clearState={() => {}}
         editable={false}
       />
       <p className="text-small-regular text-ui-fg-subtle mt-2">
-        Email cannot be changed.
+        {customer.email
+          ? "Email cannot be changed."
+          : "You are signing in with WhatsApp OTP. Add an email during checkout if needed."}
       </p>
     </div>
   )

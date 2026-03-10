@@ -3,9 +3,22 @@
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { sendAiSensyAuthenticationOtp } from "@/lib/integrations/aisensy"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import { ActionResult } from "@/lib/types/action-result"
+
+type SendOtpResult = ActionResult<{ cooldownSeconds: number }>
+type ProfileLookup = {
+  id: string
+  email: string | null
+  role: string | null
+}
+
+const DEFAULT_RESEND_COOLDOWN_SECONDS = 60
+const DEFAULT_OTP_TTL_SECONDS = 300
+const DEFAULT_OTP_MAX_ATTEMPTS = 5
+const DEFAULT_WHATSAPP_LOGIN_EMAIL_DOMAIN = "wa.toycker.store"
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "")
@@ -23,14 +36,126 @@ function validatePhone(phone: string): boolean {
   return false
 }
 
+function getNumericEnv(key: string, fallbackValue: number): number {
+  const rawValue = process.env[key]?.trim()
+
+  if (!rawValue) {
+    return fallbackValue
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10)
+
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return fallbackValue
+  }
+
+  return parsedValue
+}
+
+function getOtpHashSecret(): string {
+  const secret = process.env.OTP_HASH_SECRET?.trim()
+
+  if (!secret) {
+    throw new Error("OTP_HASH_SECRET is not configured")
+  }
+
+  return secret
+}
+
+function getSyntheticEmail(normalizedPhone: string): string {
+  const domain =
+    process.env.WHATSAPP_LOGIN_EMAIL_DOMAIN?.trim() ||
+    DEFAULT_WHATSAPP_LOGIN_EMAIL_DOMAIN
+
+  return `${normalizedPhone}@${domain}`
+}
+
+function hashOtp(phone: string, code: string): string {
+  return crypto
+    .createHmac("sha256", getOtpHashSecret())
+    .update(`${phone}:${code}`)
+    .digest("hex")
+}
+
+function compareOtpHash(expectedHash: string | null, phone: string, code: string): boolean {
+  try {
+    if (!expectedHash) {
+      return false
+    }
+
+    const providedHash = hashOtp(phone, code)
+
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedHash, "hex"),
+      Buffer.from(providedHash, "hex")
+    )
+  } catch {
+    return false
+  }
+}
+
+function sanitizeRedirectPath(value: string | null): string | null {
+  const trimmedValue = value?.trim()
+
+  if (!trimmedValue || !trimmedValue.startsWith("/") || trimmedValue.startsWith("//")) {
+    return null
+  }
+
+  return trimmedValue
+}
+
+function getRequestedRedirectPath(formData: FormData): string | null {
+  return (
+    sanitizeRedirectPath(formData.get("returnUrl") as string | null) ||
+    sanitizeRedirectPath(formData.get("next") as string | null)
+  )
+}
+
+async function findUniqueProfile(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  field: "phone" | "email",
+  value: string
+): Promise<{ row: ProfileLookup | null; duplicate: boolean; failed: boolean }> {
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("id, email, role")
+    .eq(field, value)
+    .limit(2)
+
+  if (error || !data) {
+    return { row: null, duplicate: false, failed: true }
+  }
+
+  if (data.length > 1) {
+    return { row: null, duplicate: true, failed: false }
+  }
+
+  return {
+    row: (data[0] as ProfileLookup | undefined) ?? null,
+    duplicate: false,
+    failed: false,
+  }
+}
+
 export async function sendOtp(
   _currentState: unknown,
   formData: FormData
-): Promise<ActionResult> {
-  const phone = (formData.get("phone") as string || "").trim()
+): Promise<SendOtpResult> {
+  const phone = ((formData.get("phone") as string) || "").trim()
+  const resendCooldownSeconds = getNumericEnv(
+    "OTP_RESEND_COOLDOWN_SECONDS",
+    DEFAULT_RESEND_COOLDOWN_SECONDS
+  )
+  const otpTtlSeconds = getNumericEnv("OTP_TTL_SECONDS", DEFAULT_OTP_TTL_SECONDS)
 
   if (!validatePhone(phone)) {
     return { success: false, error: "Enter a valid 10-digit Indian mobile number" }
+  }
+
+  try {
+    getOtpHashSecret()
+  } catch {
+    return { success: false, error: "WhatsApp OTP service is not configured." }
   }
 
   const normalizedPhone = normalizePhone(phone)
@@ -41,64 +166,101 @@ export async function sendOtp(
     .from("otp_codes")
     .select("created_at")
     .eq("phone", normalizedPhone)
-    .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+    .gte(
+      "created_at",
+      new Date(Date.now() - resendCooldownSeconds * 1000).toISOString()
+    )
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (recentOtp) {
-    return { success: false, error: "Please wait 60 seconds before requesting another OTP" }
+    return {
+      success: false,
+      error: `Please wait ${resendCooldownSeconds} seconds before requesting another OTP`,
+    }
   }
 
   const code = crypto.randomInt(100000, 999999).toString()
-  const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString()
+  const codeHash = hashOtp(normalizedPhone, code)
+  const now = new Date().toISOString()
+  const expiresAt = new Date(Date.now() + otpTtlSeconds * 1000).toISOString()
 
-  const { error: insertError } = await adminClient
+  await adminClient
     .from("otp_codes")
-    .insert({ phone: normalizedPhone, code, expires_at: expiresAt })
+    .update({
+      expires_at: now,
+      consumed_at: now,
+      delivery_status: "failed",
+    })
+    .eq("phone", normalizedPhone)
+    .eq("verified", false)
+    .is("consumed_at", null)
+    .gte("expires_at", now)
+
+  const { data: createdOtp, error: insertError } = await adminClient
+    .from("otp_codes")
+    .insert({
+      phone: normalizedPhone,
+      code_hash: codeHash,
+      expires_at: expiresAt,
+      delivery_status: "pending",
+    })
+    .select("id")
+    .single()
 
   if (insertError) {
     return { success: false, error: "Failed to generate OTP. Please try again." }
   }
 
-  // Send OTP via GOWA WhatsApp API
-  const gowaUrl = process.env.GOWA_API_URL
-  const gowaUser = process.env.GOWA_API_USER
-  const gowaPassword = process.env.GOWA_API_PASSWORD
-  const gowaDeviceId = process.env.GOWA_DEVICE_ID
+  try {
+    const { providerMessageId } = await sendAiSensyAuthenticationOtp({
+      destination: normalizedPhone,
+      otpCode: code,
+      userName: "Toycker Customer",
+    })
 
-  if (!gowaUrl || !gowaUser || !gowaPassword || !gowaDeviceId) {
-    return { success: false, error: "WhatsApp service not configured" }
+    await adminClient
+      .from("otp_codes")
+      .update({
+        delivery_status: "sent",
+        provider_message_id: providerMessageId ?? null,
+      })
+      .eq("id", createdOtp.id)
+  } catch (error) {
+    await adminClient
+      .from("otp_codes")
+      .update({
+        delivery_status: "failed",
+        consumed_at: new Date().toISOString(),
+      })
+      .eq("id", createdOtp.id)
+
+    console.error("Failed to send AiSensy OTP:", error)
+
+    return {
+      success: false,
+      error:
+        "Failed to send the WhatsApp OTP. Please check the AiSensy configuration and try again.",
+    }
   }
 
-  const authHeader = Buffer.from(`${gowaUser}:${gowaPassword}`).toString("base64")
-
-  const response = await fetch(`${gowaUrl}/send/message`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${authHeader}`,
-      "Content-Type": "application/json",
-      "X-Device-Id": gowaDeviceId,
+  return {
+    success: true,
+    data: {
+      cooldownSeconds: resendCooldownSeconds,
     },
-    body: JSON.stringify({
-      phone: `${normalizedPhone}@s.whatsapp.net`,
-      message: `Your Toycker login code is: ${code}\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
-    }),
-  })
-
-  if (!response.ok) {
-    return { success: false, error: "Failed to send OTP. Please try again." }
   }
-
-  return { success: true, data: undefined }
 }
 
 export async function verifyOtp(
   _currentState: unknown,
   formData: FormData
 ): Promise<ActionResult> {
-  const phone = (formData.get("phone") as string || "").trim()
-  const code = (formData.get("code") as string || "").trim()
+  const phone = ((formData.get("phone") as string) || "").trim()
+  const code = ((formData.get("code") as string) || "").trim()
+  const maxAttempts = getNumericEnv("OTP_MAX_ATTEMPTS", DEFAULT_OTP_MAX_ATTEMPTS)
+  const requestedRedirectPath = getRequestedRedirectPath(formData)
 
   if (!validatePhone(phone)) {
     return { success: false, error: "Invalid phone number" }
@@ -108,16 +270,25 @@ export async function verifyOtp(
     return { success: false, error: "Enter a valid 6-digit code" }
   }
 
+  try {
+    getOtpHashSecret()
+  } catch {
+    return { success: false, error: "WhatsApp OTP service is not configured." }
+  }
+
   const normalizedPhone = normalizePhone(phone)
   const adminClient = await createAdminClient()
 
   // Get latest non-expired, non-verified OTP for this phone
   const { data: otpRecord, error: otpError } = await adminClient
     .from("otp_codes")
-    .select("id, code, attempts")
+    .select("id, code_hash, attempts")
     .eq("phone", normalizedPhone)
     .eq("verified", false)
+    .eq("delivery_status", "sent")
+    .is("consumed_at", null)
     .gte("expires_at", new Date().toISOString())
+    .not("code_hash", "is", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -127,58 +298,97 @@ export async function verifyOtp(
   }
 
   // Check max attempts
-  if (otpRecord.attempts >= 5) {
+  if (otpRecord.attempts >= maxAttempts) {
+    await adminClient
+      .from("otp_codes")
+      .update({ consumed_at: new Date().toISOString() })
+      .eq("id", otpRecord.id)
+
     return { success: false, error: "Too many attempts. Please request a new OTP." }
   }
 
-  // Increment attempts
+  const nextAttemptCount = otpRecord.attempts + 1
+
   await adminClient
     .from("otp_codes")
-    .update({ attempts: otpRecord.attempts + 1 })
+    .update({ attempts: nextAttemptCount })
     .eq("id", otpRecord.id)
 
-  // Compare code
-  if (otpRecord.code !== code) {
+  if (!compareOtpHash(otpRecord.code_hash, normalizedPhone, code)) {
+    if (nextAttemptCount >= maxAttempts) {
+      await adminClient
+        .from("otp_codes")
+        .update({ consumed_at: new Date().toISOString() })
+        .eq("id", otpRecord.id)
+    }
+
     return { success: false, error: "Incorrect OTP. Please try again." }
   }
 
   // Mark as verified
   await adminClient
     .from("otp_codes")
-    .update({ verified: true })
+    .update({ verified: true, consumed_at: new Date().toISOString() })
     .eq("id", otpRecord.id)
 
-  // Derive synthetic email
-  const syntheticEmail = `${normalizedPhone}@wa.toycker.store`
+  const syntheticEmail = getSyntheticEmail(normalizedPhone)
+  const profileByPhone = await findUniqueProfile(adminClient, "phone", normalizedPhone)
 
-  // Check if user exists via profiles table
-  const { data: existingProfile } = await adminClient
-    .from("profiles")
-    .select("id")
-    .eq("phone", normalizedPhone)
-    .maybeSingle()
+  if (profileByPhone.failed) {
+    return { success: false, error: "Failed to verify your account. Please try again." }
+  }
+
+  if (profileByPhone.duplicate) {
+    return {
+      success: false,
+      error:
+        "This phone number is linked to multiple accounts. Please contact support.",
+    }
+  }
 
   let userId: string
+  let loginEmail = syntheticEmail
+  let isAdmin = false
 
-  if (existingProfile) {
-    userId = existingProfile.id
+  if (profileByPhone.row) {
+    userId = profileByPhone.row.id
+    loginEmail = profileByPhone.row.email || syntheticEmail
+    isAdmin = profileByPhone.row.role === "admin"
 
-    // Ensure user has the synthetic email set (in case they were created before this flow)
     await adminClient.auth.admin.updateUserById(userId, {
-      email: syntheticEmail,
-      email_confirm: true,
+      ...(profileByPhone.row.email ? {} : { email: syntheticEmail, email_confirm: true }),
       phone: normalizedPhone,
       phone_confirm: true,
     })
   } else {
-    // Also check by synthetic email (in case profile phone wasn't set yet)
-    const { data: { users: existingUsers } } = await adminClient.auth.admin.listUsers()
-    const existingUser = existingUsers?.find(u => u.email === syntheticEmail)
+    const profileByEmail = await findUniqueProfile(adminClient, "email", syntheticEmail)
 
-    if (existingUser) {
-      userId = existingUser.id
+    if (profileByEmail.failed) {
+      return {
+        success: false,
+        error: "Failed to verify your account. Please try again.",
+      }
+    }
+
+    if (profileByEmail.duplicate) {
+      return {
+        success: false,
+        error:
+          "This WhatsApp login email is linked to multiple accounts. Please contact support.",
+      }
+    }
+
+    if (profileByEmail.row) {
+      userId = profileByEmail.row.id
+      loginEmail = profileByEmail.row.email || syntheticEmail
+      isAdmin = profileByEmail.row.role === "admin"
+
+      await adminClient.auth.admin.updateUserById(userId, {
+        ...(profileByEmail.row.email ? {} : { email: syntheticEmail, email_confirm: true }),
+        phone: normalizedPhone,
+        phone_confirm: true,
+      })
     } else {
-      // Create new user
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: syntheticEmail,
         phone: normalizedPhone,
@@ -192,19 +402,22 @@ export async function verifyOtp(
       }
 
       userId = newUser.user.id
+      loginEmail = syntheticEmail
     }
-
-    // Update profile with phone
-    await adminClient
-      .from("profiles")
-      .update({ phone: normalizedPhone })
-      .eq("id", userId)
   }
 
-  // Generate magic link to create a session
+  const { error: profileUpdateError } = await adminClient
+    .from("profiles")
+    .update({ phone: normalizedPhone })
+    .eq("id", userId)
+
+  if (profileUpdateError) {
+    console.warn("Failed to sync phone to profile during OTP verification:", profileUpdateError)
+  }
+
   const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
     type: "magiclink",
-    email: syntheticEmail,
+    email: loginEmail,
   })
 
   if (linkError || !linkData.properties?.hashed_token) {
@@ -227,16 +440,9 @@ export async function verifyOtp(
   revalidatePath("/account", "layout")
   revalidateTag("customers", "max")
 
-  // Check admin role for redirect
-  const { data: profile } = await adminClient
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single()
-
-  if (profile?.role === "admin") {
+  if (isAdmin) {
     redirect("/admin")
   }
 
-  redirect("/account")
+  redirect(requestedRedirectPath || "/account")
 }
