@@ -29,8 +29,8 @@ export const contactInfo = {
     href: `tel:${PRIMARY_CONTACT_E164}`,
   },
   email: {
-    display: "customercare@toycker.com",
-    href: "mailto:customercare@toycker.com",
+    display: "support@toycker.com",
+    href: "mailto:support@toycker.com",
   },
   address:
     "shed no-7/8, sardar campus, opp. River Kent, Mota Varachha, Surat, Gujarat 394101",

@@ -233,12 +233,12 @@ const Header = ({
 
             {/* Email Contact - Right Side */}
             <a
-              href="mailto:customercare@toycker.com"
+              href="mailto:support@toycker.com"
               className="flex items-center gap-2 text-gray-700 hover:text-primary transition-colors"
               aria-label="Contact email"
             >
               <EnvelopeIcon className="w-5 h-5 flex-shrink-0" />
-              <span className="text-base font-medium">customercare@toycker.com</span>
+              <span className="text-base font-medium">support@toycker.com</span>
             </a>
           </div>
         </div>

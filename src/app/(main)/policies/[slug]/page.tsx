@@ -19,7 +19,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
         heading: "Order cancellation",
         body: [
           "Orders can be cancelled only before shipment. Once a parcel is dispatched, Cancellations should be done within 7 days.",
-          `Write to customercare@toycker.com or call ${PRIMARY_CONTACT_DISPLAY} with your order ID for manual support.`,
+          `Write to support@toycker.com or call ${PRIMARY_CONTACT_DISPLAY} with your order ID for manual support.`,
         ],
       },
       {
@@ -48,7 +48,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
       {
         heading: "Need help?",
         body: [
-          `Reach Toycker Customer Care at customercare@toycker.com or ${PRIMARY_CONTACT_DISPLAY}.`,
+          `Reach Toycker Customer Care at support@toycker.com or ${PRIMARY_CONTACT_DISPLAY}.`,
           "Postal correspondence: Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101.",
         ],
       },
@@ -84,14 +84,14 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
         heading: "Delays & support",
         body: [
           "Weather, high volume, or logistics disruptions can add time—thank you for your patience if that happens.",
-          `For help, contact ${PRIMARY_CONTACT_DISPLAY} or customercare@toycker.com (Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101).`,
+          `For help, contact ${PRIMARY_CONTACT_DISPLAY} or support@toycker.com (Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101).`,
         ],
       },
       {
         heading: "Contact information",
         body: [
           "KESHAV ENTERPRISE, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101",
-          `Phone: ${PRIMARY_CONTACT_DISPLAY} | Email: customercare@toycker.com`,
+          `Phone: ${PRIMARY_CONTACT_DISPLAY} | Email: support@toycker.com`,
         ],
       },
     ],
@@ -165,7 +165,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
         body: [
           "Access, correct, delete, or request a copy of the personal information we hold.",
           "Restrict/ object to processing, or withdraw marketing consent at any time.",
-          `Contact customercare@toycker.com / ${PRIMARY_CONTACT_DISPLAY} for privacy requests.`,
+          `Contact support@toycker.com / ${PRIMARY_CONTACT_DISPLAY} for privacy requests.`,
         ],
       },
       {
@@ -180,7 +180,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
         heading: "Contact",
         body: [
           "KESHAV ENTERPRISE, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101.",
-          `customercare@toycker.com | ${PRIMARY_CONTACT_DISPLAY}`,
+          `support@toycker.com | ${PRIMARY_CONTACT_DISPLAY}`,
         ],
       },
     ],

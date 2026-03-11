@@ -35,7 +35,7 @@ export async function sendContactEmail(
         // Validate input data
         const validatedData = ContactFormSchema.parse(data)
 
-        const recipientEmail = process.env.CONTACT_FORM_RECIPIENT || "customercare@toycker.com"
+        const recipientEmail = process.env.CONTACT_FORM_RECIPIENT || "support@toycker.com"
         const senderEmail = process.env.CONTACT_FORM_SENDER || "toycker@apexture.in"
 
         // Format the email content
@@ -103,7 +103,7 @@ export async function sendProductQuestion(
     try {
         const validatedData = ProductQuestionSchema.parse(data)
 
-        const recipientEmail = process.env.CONTACT_FORM_RECIPIENT || "customercare@toycker.com"
+        const recipientEmail = process.env.CONTACT_FORM_RECIPIENT || "support@toycker.com"
         const senderEmail = process.env.CONTACT_FORM_SENDER || "toycker@apexture.in"
 
         const htmlContent = `

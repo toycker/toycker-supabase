@@ -279,7 +279,7 @@ export default function Footer() {
       <div className="bg-primary footer-bottom-bar">
         <div className="mx-auto px-4 max-w-[1440px]">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 text-center text-sm text-white drop-shadow">
-            <p>© {year} Toycker. All Rights Reserved by Toycker Studio</p>
+            <p>© {year} Toycker. All Rights Reserved by Keshav Enterprise</p>
             <div className="flex items-center gap-2">
               <span className="text-white">Managed by</span>
               <a href="https://apexture.in" target="_blank" rel="noopener noreferrer" className="inline-block transition-transform hover:scale-105">

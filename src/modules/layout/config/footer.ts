@@ -57,9 +57,9 @@ export const footerContactItems: FooterContactItem[] = [
   },
   {
     id: "email",  
-    label: "customercare@toycker.com",
-    value: "customercare@toycker.com",
-    href: "mailto:customercare@toycker.com",
+    label: "support@toycker.com",
+    value: "support@toycker.com",
+    href: "mailto:support@toycker.com",
     type: "email",
   }
 ]

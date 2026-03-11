@@ -599,7 +599,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
             case 'contact_email':
                 addBotMessage(
-                    "📧 **Email Us**\n\n**Email:** customercare@toycker.com\n\nWe typically respond within 24 hours on business days!",
+                    "📧 **Email Us**\n\n**Email:** support@toycker.com\n\nWe typically respond within 24 hours on business days!",
                     [BACK_TO_MENU]
                 )
                 break
