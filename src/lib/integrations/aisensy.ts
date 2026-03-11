@@ -109,9 +109,15 @@ function extractProviderMessageId(value: unknown): string | undefined {
     for (const [key, nestedValue] of Object.entries(current)) {
       if (
         typeof nestedValue === "string" &&
-        ["id", "messageId", "message_id", "campaignId", "campaign_id"].includes(
-          key
-        )
+        [
+          "id",
+          "messageId",
+          "message_id",
+          "campaignId",
+          "campaign_id",
+          "submitted_message_id",
+          "submittedMessageId",
+        ].includes(key)
       ) {
         return nestedValue
       }
@@ -190,3 +196,4 @@ export async function sendAiSensyAuthenticationOtp({
     providerMessageId: extractProviderMessageId(responseBody),
   }
 }
+

@@ -210,6 +210,7 @@ export async function sendOtp(
     .single()
 
   if (insertError) {
+    console.error("Failed to create OTP record:", insertError)
     return { success: false, error: "Failed to generate OTP. Please try again." }
   }
 
