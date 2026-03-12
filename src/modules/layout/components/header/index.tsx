@@ -155,7 +155,7 @@ const Header = ({
                   />
                 </div>
                 */}
-                <span className="text-2xl font-bold tracking-wide text-white">Toycker</span>
+                <span className="text-2xl font-bold tracking-wide text-white">toycker.com</span>
               </LocalizedClientLink>
             </div>
 
