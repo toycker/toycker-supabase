@@ -606,7 +606,7 @@ export function ChatbotProvider({ children }: { children: React.ReactNode }) {
 
             case 'contact_locations':
                 addBotMessage(
-                    `📍 **Store Locations**\n\n**HEAD OFFICE - VARACHHA**\nshed no-7/8, sardar campus, opp. River Kent,\nMota Varachha, Surat, Gujarat 394101\n📞 ${PRIMARY_CONTACT_DISPLAY}\n\n**BRANCH 2 - ADAJAN**\nGujarat Gas circle, krishna Nagar Society,\nPremjinagar Society-1, Gita Nagar,\nAdajan, Surat\n📞 +91 90991 44170`,
+                    `📍 **Store Locations**\n\n**HEAD OFFICE - VARACHHA**\nshed no-7/8, sardar campus, opp. River Kent,\nMota Varachha, Surat, Gujarat 394101\n📞 ${PRIMARY_CONTACT_DISPLAY}\n\n**BRANCH 2 - ADAJAN**\nPlot No.C/4,C/5, Geetanagar Co.Op.Hou.Society,\nRing Road, Gujarat Gas Circle,\nAdajan, Surat, Gujarat, 395009\n📞 +91 90991 44170`,
                     [BACK_TO_MENU]
                 )
                 break

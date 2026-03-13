@@ -90,7 +90,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
       {
         heading: "Contact information",
         body: [
-          "KESHAV ENTERPRISE, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101",
+          "TOYCKER INDIA, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101",
           `Phone: ${PRIMARY_CONTACT_DISPLAY} | Email: support@toycker.com`,
         ],
       },
@@ -142,7 +142,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
   privacy: {
     title: "Privacy Policy",
     intro:
-      "Effective 11 August 2025 – This Privacy Policy explains how Keshav Enterprises (Toycker.com) collects, uses, and protects data every time you browse or shop with us.",
+      "Effective 11 August 2025 – This Privacy Policy explains how TOYCKER INDIAs (Toycker.com) collects, uses, and protects data every time you browse or shop with us.",
     sections: [
       {
         heading: "What we collect",
@@ -179,7 +179,7 @@ const POLICY_CONTENT: Record<PolicySlug, { title: string; intro: string; section
       {
         heading: "Contact",
         body: [
-          "KESHAV ENTERPRISE, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101.",
+          "TOYCKER INDIA, Shed No. 7/8, Sardar Campus, Opp. River Kent, Mota Varachha, Surat, Gujarat, 394101.",
           `support@toycker.com | ${PRIMARY_CONTACT_DISPLAY}`,
         ],
       },

@@ -76,15 +76,16 @@ export const contactLocations: ContactLocation[] = [
     title: "BRANCH 2 - ADAJAN",
     label: "Branch 2",
     addressLines: [
-      "Gujarat Gas circle, krishna Nagar Society,",
-      "Premjinagar Society-1, Gita Nagar,",
-      "Adajan, Surat",
+      "Plot No.C/4,C/5, Geetanagar Co.Op.Hou.Society,",
+      "Ring Road, Gujarat Gas Circle,",
+      "Adajan, Surat, Gujarat, 395009",
     ],
     phone: {
       display: "+91 90991 44170",
       href: "tel:+919099144170",
     },
-    mapQuery: "Toycker Adajan, Gujarat Gas circle, Adajan, Surat",
+    mapQuery:
+      "Plot No.C/4,C/5, Geetanagar Co.Op.Hou.Society, Ring Road, Gujarat Gas Circle, Adajan, Surat, Gujarat, 395009",
     virtualTourUrl: "https://maps.app.goo.gl/XNVLuFb6Mig5zzWs7",
   },
 ]
