@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import React from "react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { Cart } from "@/lib/supabase/types"
+import { Cart, CustomerProfile } from "@/lib/supabase/types"
 import BillingAddress from "@modules/checkout/components/billing_address"
 import PaymentButton from "@modules/checkout/components/payment-button"
 import ShippingAddress from "@modules/checkout/components/shipping-address"
@@ -11,6 +11,11 @@ import {
   Address as CheckoutAddress,
   useCheckoutState,
 } from "@modules/checkout/hooks/useCheckoutState"
+
+const { completeCheckoutMock, pushMock } = vi.hoisted(() => ({
+  completeCheckoutMock: vi.fn(),
+  pushMock: vi.fn(),
+}))
 
 type TestCheckoutContextValue = {
   state: {
@@ -41,7 +46,7 @@ const { checkoutContextStore } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/actions/complete-checkout", () => ({
-  completeCheckout: vi.fn(),
+  completeCheckout: completeCheckoutMock,
 }))
 
 vi.mock("@modules/checkout/context/checkout-context", () => ({
@@ -56,7 +61,7 @@ vi.mock("@modules/checkout/context/checkout-context", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: pushMock,
   }),
 }))
 
@@ -86,6 +91,32 @@ const cart: Cart = {
       },
     ],
   },
+}
+
+const authenticatedCustomer: CustomerProfile = {
+  id: "user-1",
+  email: "buyer@example.com",
+  first_name: "Kartavya",
+  last_name: "Patel",
+  phone: "919876543210",
+  created_at: "2026-03-13T10:00:00.000Z",
+  addresses: [
+    {
+      id: "addr-1",
+      first_name: "Kartavya",
+      last_name: "Patel",
+      address_1: "Saved Address",
+      address_2: null,
+      city: "Surat",
+      country_code: "in",
+      province: "Gujarat",
+      postal_code: "395009",
+      phone: "9999999999",
+      company: null,
+      is_default_billing: true,
+      is_default_shipping: false,
+    },
+  ],
 }
 
 function createCheckoutContextValue(
@@ -176,6 +207,36 @@ function fillBillingAddress() {
 }
 
 describe("checkout address readiness", () => {
+  beforeEach(() => {
+    completeCheckoutMock.mockReset()
+    pushMock.mockReset()
+  })
+
+  it("keeps shipping phone blank and blocks checkout until a separate delivery phone is entered", async () => {
+    render(<CheckoutHarness testCart={cart} />)
+
+    fillBillingAddress()
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-order-button")).not.toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByTestId("shipping-address-checkbox"))
+
+    const shippingPhoneInput = await screen.findByTestId("shipping-phone-input")
+
+    expect(shippingPhoneInput).toHaveValue("")
+    expect(screen.getByTestId("submit-order-button")).toBeDisabled()
+
+    fireEvent.change(shippingPhoneInput, {
+      target: { value: "9876543210" },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-order-button")).not.toBeDisabled()
+    })
+  })
+
   it("enables place order when billing is completed and shipping matches billing", async () => {
     render(<CheckoutHarness testCart={cart} />)
 
@@ -190,7 +251,14 @@ describe("checkout address readiness", () => {
     })
   })
 
-  it("shows shipping fields with copied billing values when delivery address is different", async () => {
+  it("submits the manually entered shipping phone when delivery address is different", async () => {
+    completeCheckoutMock.mockResolvedValue({
+      success: true,
+      orderId: "order-1",
+      paymentData: null,
+    })
+    pushMock.mockReset()
+
     render(<CheckoutHarness testCart={cart} />)
 
     fillBillingAddress()
@@ -209,15 +277,33 @@ describe("checkout address readiness", () => {
     expect(screen.getByTestId("shipping-address-input")).toHaveValue(
       "Mota Varachha"
     )
-    expect(screen.getByTestId("submit-order-button")).not.toBeDisabled()
+    expect(screen.getByTestId("shipping-phone-input")).toHaveValue("")
+    expect(screen.getByTestId("submit-order-button")).toBeDisabled()
 
     fireEvent.change(screen.getByTestId("shipping-address-input"), {
       target: { value: "Adajan" },
+    })
+    fireEvent.change(screen.getByTestId("shipping-phone-input"), {
+      target: { value: "9876543210" },
     })
 
     await waitFor(() => {
       expect(screen.getByTestId("submit-order-button")).not.toBeDisabled()
     })
+
+    fireEvent.click(screen.getByTestId("submit-order-button"))
+
+    await waitFor(() => {
+      expect(completeCheckoutMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(completeCheckoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shippingAddress: expect.objectContaining({
+          phone: "9876543210",
+        }),
+      })
+    )
   })
 
   it("initializes billing checkout state with a real default country code", async () => {
@@ -244,5 +330,29 @@ describe("checkout address readiness", () => {
         country_code: "in",
       })
     )
+  })
+
+  it("locks the billing phone to the authenticated account phone", () => {
+    checkoutContextStore.current = createCheckoutContextValue()
+
+    render(
+      <BillingAddress
+        customer={authenticatedCustomer}
+        cart={{
+          ...cart,
+          billing_address: {
+            ...authenticatedCustomer.addresses[0],
+            postal_code: "",
+          },
+        }}
+        checked
+        onChange={vi.fn()}
+      />
+    )
+
+    const billingPhoneInput = screen.getByTestId("billing-phone-input")
+
+    expect(billingPhoneInput).toHaveValue("9876543210")
+    expect(billingPhoneInput).toHaveAttribute("readonly")
   })
 })

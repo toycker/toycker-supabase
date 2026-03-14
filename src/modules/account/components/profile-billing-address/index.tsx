@@ -8,6 +8,7 @@ import AccountInfo from "../account-info"
 import { CustomerProfile, Region } from "@/lib/supabase/types"
 import { addCustomerAddress, updateCustomerAddress } from "@lib/data/customer"
 import CountrySelect from "@modules/checkout/components/country-select"
+import { getCheckoutPhoneValue } from "@/lib/util/customer-phone"
 
 type MyInformationProps = {
   customer: CustomerProfile
@@ -33,24 +34,17 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
 
   const [successState, setSuccessState] = React.useState(false)
 
-  const billingAddress = customer.addresses?.find(
-    (addr: any) => addr.is_default_billing
-  )
-
-  const initialState: Record<string, any> = {
-    isDefaultBilling: true,
-    isDefaultShipping: false,
-    error: false,
-    success: false,
-  }
-
-  if (billingAddress) {
-    initialState.addressId = billingAddress.id
-  }
+  const billingAddress = customer.addresses?.find((addr) => addr.is_default_billing)
+  const billingPhone =
+    getCheckoutPhoneValue(customer.phone) ||
+    getCheckoutPhoneValue(billingAddress?.phone)
 
   const [state, formAction] = useActionState(
     billingAddress ? updateCustomerAddress : addCustomerAddress,
-    initialState
+    {
+      success: false,
+      error: null as string | null,
+    }
   )
 
   const clearState = () => {
@@ -127,15 +121,19 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
             data-testid="billing-company-input"
           />
           <Input
-            key={customer.phone}
+            key={billingPhone}
             label="Phone"
             name="phone"
             type="phone"
             autoComplete="phone"
             required
-            defaultValue={billingAddress?.phone ?? customer?.phone ?? ""}
+            defaultValue={billingPhone}
+            readOnly
             data-testid="billing-phone-input"
           />
+          <p className="text-xs text-gray-500">
+            This phone is linked to your WhatsApp login and cannot be changed.
+          </p>
           <Input
             label="Address"
             name="address_1"

@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
+import { retrieveCustomer } from "@lib/data/customer"
 import { retrieveOrder } from "@lib/data/orders"
 import { getCustomerOrderPageMetadata } from "@/lib/util/customer-order-state"
 import OrderCompletedTemplate from "@modules/order/templates/order-completed-template"
@@ -22,11 +23,23 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 
 export default async function OrderConfirmedPage(props: Props) {
   const params = await props.params
-  const order = await retrieveOrder(params.id)
+  const [order, customer] = await Promise.all([
+    retrieveOrder(params.id),
+    retrieveCustomer(),
+  ])
 
   if (!order) {
     return notFound()
   }
 
-  return <OrderCompletedTemplate order={order} context="post_checkout" />
+  const customerPhone =
+    customer && customer.id === order.user_id ? customer.phone : null
+
+  return (
+    <OrderCompletedTemplate
+      order={order}
+      customerPhone={customerPhone}
+      context="post_checkout"
+    />
+  )
 }

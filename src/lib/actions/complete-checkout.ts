@@ -4,6 +4,8 @@ import { z } from "zod"
 import { revalidateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { PaymentCollection } from "@/lib/supabase/types"
+import { resolveCustomerPhone } from "@/lib/util/customer-contact-phone"
+import { getCheckoutPhoneValue } from "@/lib/util/customer-phone"
 
 // Validation schema for checkout data
 const AddressSchema = z.object({
@@ -59,6 +61,20 @@ function isBlank(value: string | null | undefined): boolean {
   return !value?.trim()
 }
 
+function resolveLockedBillingPhone(
+  profilePhone: string | null | undefined,
+  userMetadata: unknown,
+  authPhone: string | null | undefined
+): string | null {
+  const accountPhone = resolveCustomerPhone({
+    profilePhone,
+    userMetadata,
+    authPhone,
+  })
+
+  return normalizeOptionalValue(getCheckoutPhoneValue(accountPhone))
+}
+
 function mapCheckoutAddressToSavedAddress(address: CheckoutData["billingAddress"]) {
   return {
     first_name: address.first_name.trim(),
@@ -82,47 +98,13 @@ export async function completeCheckout(
     const validatedData = CheckoutSchema.parse(data)
 
     const supabase = await createClient()
-
-    // Step 1: Initialize payment session (generates client secrets, PayU hashes, etc.)
-    // This updates the cart in the DB with the necessary payment data
-    const { initiatePaymentSession } = await import("@lib/data/cart")
-    await initiatePaymentSession(
-      { id: validatedData.cartId },
-      {
-        provider_id: validatedData.paymentMethod,
-        customerEmail: validatedData.email,
-        customerAddress: validatedData.billingAddress,
-      }
-    )
-
-    // Step 2: Call Supabase RPC function for atomic order creation
-    // The RPC will now find the initialized payment session data in the cart record
-    const { data: result, error } = await supabase.rpc(
-      "create_order_with_payment",
-      {
-        p_cart_id: validatedData.cartId,
-        p_email: validatedData.email,
-        p_shipping_address: validatedData.shippingAddress,
-        p_billing_address: validatedData.billingAddress,
-        p_payment_provider: validatedData.paymentMethod,
-        p_rewards_to_apply: validatedData.rewardsToApply,
-      }
-    )
-
-    if (error) {
-      console.error("Order creation error:", error)
-      return {
-        success: false,
-        error: error.message || "Failed to create order. Please try again.",
-      }
-    }
-
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    let existingProfile: CheckoutProfileRow | null = null
 
     if (user) {
-      const { data: existingProfile, error: profileReadError } = await supabase
+      const { data: profileRow, error: profileReadError } = await supabase
         .from("profiles")
         .select("first_name, last_name, phone")
         .eq("id", user.id)
@@ -135,27 +117,94 @@ export async function completeCheckout(
         )
       }
 
+      existingProfile = profileRow
+    }
+
+    const lockedBillingPhone = user
+      ? resolveLockedBillingPhone(
+          existingProfile?.phone,
+          user.user_metadata,
+          user.phone
+        )
+      : null
+    const checkoutData: CheckoutData = {
+      ...validatedData,
+      billingAddress: {
+        ...validatedData.billingAddress,
+        phone:
+          lockedBillingPhone ??
+          normalizeOptionalValue(validatedData.billingAddress.phone),
+      },
+    }
+
+    // Step 1: Initialize payment session (generates client secrets, PayU hashes, etc.)
+    // This updates the cart in the DB with the necessary payment data
+    const { initiatePaymentSession } = await import("@lib/data/cart")
+    await initiatePaymentSession(
+      { id: checkoutData.cartId },
+      {
+        provider_id: checkoutData.paymentMethod,
+        customerEmail: checkoutData.email,
+        customerAddress: checkoutData.billingAddress,
+      }
+    )
+
+    // Step 2: Call Supabase RPC function for atomic order creation
+    // The RPC will now find the initialized payment session data in the cart record
+    const { data: result, error } = await supabase.rpc(
+      "create_order_with_payment",
+      {
+        p_cart_id: checkoutData.cartId,
+        p_email: checkoutData.email,
+        p_shipping_address: checkoutData.shippingAddress,
+        p_billing_address: checkoutData.billingAddress,
+        p_payment_provider: checkoutData.paymentMethod,
+        p_rewards_to_apply: checkoutData.rewardsToApply,
+      }
+    )
+
+    if (error) {
+      console.error("Order creation error:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to create order. Please try again.",
+      }
+    }
+
+    if (user) {
       const profileUpdate: {
         contact_email: string
         first_name?: string
         last_name?: string
         phone?: string
       } = {
-        contact_email: validatedData.email.trim(),
+        contact_email: checkoutData.email.trim(),
       }
 
       if (isBlank(existingProfile?.first_name)) {
-        profileUpdate.first_name = validatedData.billingAddress.first_name.trim()
+        profileUpdate.first_name = checkoutData.billingAddress.first_name.trim()
       }
 
       if (isBlank(existingProfile?.last_name)) {
-        profileUpdate.last_name = validatedData.billingAddress.last_name.trim()
+        profileUpdate.last_name = checkoutData.billingAddress.last_name.trim()
       }
 
       if (isBlank(existingProfile?.phone)) {
-        const billingPhone = normalizeOptionalValue(validatedData.billingAddress.phone)
-        if (billingPhone) {
-          profileUpdate.phone = billingPhone
+        const accountPhone = normalizeOptionalValue(
+          resolveCustomerPhone({
+            profilePhone: existingProfile?.phone,
+            userMetadata: user.user_metadata,
+            authPhone: user.phone,
+          })
+        )
+
+        if (accountPhone) {
+          profileUpdate.phone = accountPhone
+        } else {
+          const billingPhone = normalizeOptionalValue(checkoutData.billingAddress.phone)
+          if (billingPhone) {
+            profileUpdate.phone = billingPhone
+          }
         }
       }
 
@@ -182,10 +231,10 @@ export async function completeCheckout(
 
         await saveCheckoutAddresses({
           billingAddress: mapCheckoutAddressToSavedAddress(
-            validatedData.billingAddress
+            checkoutData.billingAddress
           ),
           shippingAddress: mapCheckoutAddressToSavedAddress(
-            validatedData.shippingAddress
+            checkoutData.shippingAddress
           ),
           userId: user.id,
         })
@@ -203,18 +252,18 @@ export async function completeCheckout(
 
     // Step 3: For non-gateway payments (COD, manual), run post-order logic now.
     // Gateway payments (PayU) handle this in their callback after payment verification.
-    const isGatewayPayment = validatedData.paymentMethod.includes("payu")
+    const isGatewayPayment = checkoutData.paymentMethod.includes("payu")
 
     if (!isGatewayPayment && orderData) {
       const { handlePostOrderLogic, retrieveCart } = await import(
         "@lib/data/cart"
       )
-      const cart = await retrieveCart(validatedData.cartId)
+      const cart = await retrieveCart(checkoutData.cartId)
       if (cart) {
         await handlePostOrderLogic(
           orderData,
           cart,
-          validatedData.rewardsToApply
+          checkoutData.rewardsToApply
         )
       }
     }
@@ -228,7 +277,7 @@ export async function completeCheckout(
       paymentData:
         (((orderData?.payment_collection as PaymentCollection | null | undefined)
           ?.payment_sessions.find(
-            (session) => session.provider_id === validatedData.paymentMethod
+            (session) => session.provider_id === checkoutData.paymentMethod
           )?.data as CheckoutPaymentData | undefined) ?? null),
     }
   } catch (error) {

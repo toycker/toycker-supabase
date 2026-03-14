@@ -51,8 +51,7 @@ type AddressFormSource = {
 
 function buildFormData(
   cart: Cart | null,
-  initialAddress: AddressFormSource | null,
-  customerPhone: string
+  initialAddress: AddressFormSource | null
 ): ShippingFormData {
   return {
     "shipping_address.first_name": initialAddress?.first_name || "",
@@ -68,10 +67,7 @@ function buildFormData(
       cart?.billing_address?.country_code ||
       "in",
     "shipping_address.province": initialAddress?.province || "",
-    "shipping_address.phone": getCheckoutPhoneValue(
-      initialAddress?.phone,
-      customerPhone
-    ),
+    "shipping_address.phone": getCheckoutPhoneValue(initialAddress?.phone),
   }
 }
 
@@ -83,12 +79,10 @@ const ShippingAddress = ({
   cart: Cart | null
 }) => {
   const { state, setShippingAddress } = useCheckout()
-  const customerPhone = getCheckoutPhoneValue(customer?.phone)
-  const initialAddress =
-    state.shippingAddress ?? cart?.shipping_address ?? cart?.billing_address ?? null
+  const initialAddress = state.shippingAddress ?? cart?.shipping_address ?? null
 
   const [formData, setFormData] = useState<ShippingFormData>(() =>
-    buildFormData(cart, initialAddress, customerPhone)
+    buildFormData(cart, initialAddress)
   )
 
   const [pincodeLoading, setPincodeLoading] = useState(false)
@@ -133,13 +127,10 @@ const ShippingAddress = ({
           cart?.billing_address?.country_code ||
           "in",
         "shipping_address.province": address.province || "",
-        "shipping_address.phone": getCheckoutPhoneValue(
-          address.phone,
-          customerPhone
-        ),
+        "shipping_address.phone": getCheckoutPhoneValue(address.phone),
       }))
     },
-    [cart?.billing_address?.country_code, cart?.shipping_address?.country_code, customerPhone]
+    [cart?.billing_address?.country_code, cart?.shipping_address?.country_code]
   )
 
   const addressInput = useMemo<ComparableAddress>(

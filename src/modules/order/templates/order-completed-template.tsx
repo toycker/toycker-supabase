@@ -13,11 +13,13 @@ import { AlertCircle, Check, XCircle } from "lucide-react"
 
 type OrderCompletedTemplateProps = {
   order: Order
+  customerPhone?: string | null
   context?: "post_checkout" | "account"
 }
 
 export default function OrderCompletedTemplate({
   order,
+  customerPhone,
   context = "post_checkout",
 }: OrderCompletedTemplateProps) {
   const metadata = order.metadata as Record<string, unknown> | null
@@ -119,7 +121,7 @@ export default function OrderCompletedTemplate({
 
           <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10">
-              <OrderDetails order={order} />
+              <OrderDetails order={order} customerPhone={customerPhone} />
             </div>
 
             {heroContent.showTracking && (

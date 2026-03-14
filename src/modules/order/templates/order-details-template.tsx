@@ -12,10 +12,12 @@ import { Order } from "@/lib/supabase/types"
 
 type OrderDetailsTemplateProps = {
   order: Order
+  customerPhone?: string | null
 }
 
 const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
   order,
+  customerPhone,
 }) => {
   return (
     <div className="flex flex-col justify-center gap-y-4">
@@ -33,7 +35,11 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
         className="flex flex-col gap-4 h-full bg-white w-full"
         data-testid="order-details-container"
       >
-        <OrderDetails order={order} showStatus />
+        <OrderDetails
+          order={order}
+          customerPhone={customerPhone}
+          showStatus
+        />
         <Items order={order} />
         <ShippingDetails order={order} />
         <CartTotals totals={order} order={order} />

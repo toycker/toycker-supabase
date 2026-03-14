@@ -71,6 +71,9 @@ function buildFormData(
   customerPhone: string,
   customerEmail: string
 ): BillingFormData {
+  const billingPhone =
+    customerPhone || getCheckoutPhoneValue(initialAddress?.phone)
+
   return {
     "billing_address.first_name": initialAddress?.first_name || "",
     "billing_address.last_name": initialAddress?.last_name || "",
@@ -81,10 +84,7 @@ function buildFormData(
     "billing_address.city": initialAddress?.city || "",
     "billing_address.country_code": getDefaultCountryCode(cart, initialAddress),
     "billing_address.province": initialAddress?.province || "",
-    "billing_address.phone": getCheckoutPhoneValue(
-      initialAddress?.phone,
-      customerPhone
-    ),
+    "billing_address.phone": billingPhone,
     email: customerEmail,
   }
 }
@@ -108,6 +108,7 @@ const BillingAddress = ({
   } = useCheckout()
   const customerFacingCartEmail = getCustomerFacingEmail(cart?.email)
   const customerPhone = getCheckoutPhoneValue(customer?.phone)
+  const isBillingPhoneLocked = Boolean(customer)
   const resolvedCheckoutEmail = customerFacingCartEmail || customer?.email || ""
   const initialAddress =
     state.billingAddress ?? cart?.billing_address ?? cart?.shipping_address ?? null
@@ -136,6 +137,14 @@ const BillingAddress = ({
             address.country_code === "in")
       ) || [],
     [customer?.addresses, countriesInRegion]
+  )
+  const selectableAddresses = useMemo(
+    () =>
+      addressesInRegion.map((address) => ({
+        ...address,
+        phone: customerPhone || getCheckoutPhoneValue(address.phone),
+      })),
+    [addressesInRegion, customerPhone]
   )
 
   const addressInput = useMemo<ComparableAddress>(
@@ -170,10 +179,8 @@ const BillingAddress = ({
         "billing_address.country_code":
           address.country_code || getDefaultCountryCode(cart, address),
         "billing_address.province": address.province || "",
-        "billing_address.phone": getCheckoutPhoneValue(
-          address.phone,
-          customerPhone
-        ),
+        "billing_address.phone":
+          customerPhone || getCheckoutPhoneValue(address.phone),
       }))
     },
     [cart, customerPhone]
@@ -233,13 +240,13 @@ const BillingAddress = ({
 
   return (
     <>
-      {customer && addressesInRegion.length > 0 && (
+      {customer && selectableAddresses.length > 0 && (
         <div className="mb-4 sm:mb-6 flex flex-col gap-y-3 sm:gap-y-4 p-3 sm:p-5 border border-gray-200 rounded-lg">
           <p className="text-xs sm:text-sm">
             {`Hi ${customer.first_name}, do you want to use one of your saved addresses?`}
           </p>
           <AddressSelect
-            addresses={addressesInRegion}
+            addresses={selectableAddresses}
             addressInput={addressInput}
             onSelect={setFormAddress}
           />
@@ -361,10 +368,16 @@ const BillingAddress = ({
           autoComplete="tel"
           value={formData["billing_address.phone"] || ""}
           onChange={handleChange}
+          readOnly={isBillingPhoneLocked}
           required
           data-testid="billing-phone-input"
         />
       </div>
+      {isBillingPhoneLocked && (
+        <p className="text-xs text-gray-500 mb-4">
+          This phone is linked to your WhatsApp login and cannot be changed.
+        </p>
+      )}
     </>
   )
 }

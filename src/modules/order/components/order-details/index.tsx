@@ -3,10 +3,11 @@ import { Text } from "@modules/common/components/text"
 
 type OrderDetailsProps = {
   order: Order
+  customerPhone?: string | null
   showStatus?: boolean
 }
 
-const OrderDetails = ({ order }: OrderDetailsProps) => {
+const OrderDetails = ({ order, customerPhone }: OrderDetailsProps) => {
   const isCOD =
     order.payment_method?.toLowerCase().includes("cod") ||
     order.payment_method?.toLowerCase().includes("cash") ||
@@ -59,9 +60,9 @@ const OrderDetails = ({ order }: OrderDetailsProps) => {
           <Text className="text-lg font-bold text-slate-900">
             {order.customer_email || order.email}
           </Text>
-          {order.shipping_address?.phone && (
+          {customerPhone && (
             <Text className="text-slate-500 font-medium">
-              {order.shipping_address.phone}
+              {customerPhone}
             </Text>
           )}
         </div>

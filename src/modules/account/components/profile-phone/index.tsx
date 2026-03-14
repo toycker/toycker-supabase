@@ -1,74 +1,31 @@
 "use client"
 
-import React, { useEffect, useActionState } from "react";
-
-import Input from "@modules/common/components/input"
+import React from "react"
 
 import AccountInfo from "../account-info"
 import { CustomerProfile } from "@/lib/supabase/types"
-import { updateCustomer } from "@lib/data/customer"
+import { getCheckoutPhoneValue } from "@/lib/util/customer-phone"
 
 type MyInformationProps = {
   customer: CustomerProfile
 }
 
 const ProfilePhone: React.FC<MyInformationProps> = ({ customer }) => {
-  const [successState, setSuccessState] = React.useState(false)
-
-  const updateCustomerPhone = async (
-    _currentState: Record<string, unknown>,
-    formData: FormData
-  ) => {
-    const customer = {
-      phone: formData.get("phone") as string,
-    }
-
-    try {
-      await updateCustomer(customer)
-      return { success: true, error: null }
-    } catch (error: any) {
-      return { success: false, error: error.toString() }
-    }
-  }
-
-  const [state, formAction] = useActionState(updateCustomerPhone, {
-    error: false,
-    success: false,
-  })
-
-  const clearState = () => {
-    setSuccessState(false)
-  }
-
-  useEffect(() => {
-    setSuccessState(state.success)
-  }, [state])
+  const displayPhone = getCheckoutPhoneValue(customer.phone) || "No phone number"
 
   return (
-    <form action={formAction} className="w-full">
+    <div className="w-full">
       <AccountInfo
         label="Phone"
-        currentInfo={customer.phone || "No phone number"}
-        isSuccess={successState}
-        isError={!!state.error}
-        errorMessage={state.error || undefined}
-        clearState={clearState}
+        currentInfo={displayPhone}
+        clearState={() => {}}
         data-testid="account-phone-editor"
-      >
-        <div className="grid grid-cols-1 gap-y-2">
-          <Input
-            key={customer.phone}
-            label="Phone"
-            name="phone"
-            type="phone"
-            autoComplete="phone"
-            required
-            defaultValue={customer.phone ?? ""}
-            data-testid="phone-input"
-          />
-        </div>
-      </AccountInfo>
-    </form>
+        editable={false}
+      />
+      <p className="text-small-regular text-ui-fg-subtle mt-2">
+        Your phone is linked to your WhatsApp login and cannot be changed.
+      </p>
+    </div>
   )
 }
 

@@ -54,6 +54,8 @@ const mockCheckoutData: CheckoutData = {
 
 type MockUser = {
   id: string
+  phone?: string | null
+  user_metadata?: Record<string, unknown>
 }
 
 function buildSupabaseMock({
@@ -192,6 +194,60 @@ describe("completeCheckout Integration", () => {
       }),
       userId: "user-1",
     })
+  })
+
+  it("should override authenticated billing phone with the immutable account phone", async () => {
+    const { mockRpc } = buildSupabaseMock({
+      user: {
+        id: "user-1",
+        phone: "919876543210",
+        user_metadata: {
+          phone_number: "919876543210",
+        },
+      },
+      profileRow: {
+        first_name: "John",
+        last_name: "Doe",
+        phone: "919876543210",
+      },
+    })
+
+    vi.mocked(cartData.initiatePaymentSession).mockResolvedValue(undefined)
+    vi.mocked(cartData.retrieveCart).mockResolvedValue({ id: "test-cart-id" } as never)
+    vi.mocked(cartData.handlePostOrderLogic).mockResolvedValue(undefined)
+    vi.mocked(cartData.saveCheckoutAddresses).mockResolvedValue(undefined)
+
+    await completeCheckout({
+      ...mockCheckoutData,
+      billingAddress: {
+        ...mockCheckoutData.billingAddress,
+        phone: "1111111111",
+      },
+    })
+
+    expect(cartData.initiatePaymentSession).toHaveBeenCalledWith(
+      { id: "test-cart-id" },
+      expect.objectContaining({
+        customerAddress: expect.objectContaining({
+          phone: "9876543210",
+        }),
+      })
+    )
+    expect(mockRpc).toHaveBeenCalledWith(
+      "create_order_with_payment",
+      expect.objectContaining({
+        p_billing_address: expect.objectContaining({
+          phone: "9876543210",
+        }),
+      })
+    )
+    expect(cartData.saveCheckoutAddresses).toHaveBeenCalledWith(
+      expect.objectContaining({
+        billingAddress: expect.objectContaining({
+          phone: "9876543210",
+        }),
+      })
+    )
   })
 
   it("should handle order creation failure", async () => {

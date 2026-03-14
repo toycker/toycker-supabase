@@ -8,6 +8,53 @@ import { redirect } from "next/navigation"
 import { removeCartId } from "./cookies"
 import { CustomerProfile, Address } from "@/lib/supabase/types"
 import { getCustomerFacingEmail } from "@/lib/util/customer-email"
+import { getCheckoutPhoneValue } from "@/lib/util/customer-phone"
+import { resolveCustomerPhone } from "@/lib/util/customer-contact-phone"
+
+type CustomerProfilePhoneRow = {
+  phone: string | null
+}
+
+type CustomerAddressFlagsRow = {
+  is_default_billing: boolean | null
+  is_default_shipping: boolean | null
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  const trimmedValue = value?.trim()
+  return trimmedValue ? trimmedValue : null
+}
+
+function getBooleanFormValue(formData: FormData, key: string): boolean | null {
+  if (!formData.has(key)) {
+    return null
+  }
+
+  return formData.get(key) === "true"
+}
+
+async function resolveImmutableCustomerPhone(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: NonNullable<Awaited<ReturnType<typeof getAuthUser>>>
+): Promise<string | null> {
+  const { data: profileRow, error: profileError } = await supabase
+    .from("profiles")
+    .select("phone")
+    .eq("id", user.id)
+    .maybeSingle<CustomerProfilePhoneRow>()
+
+  if (profileError) {
+    console.warn("Failed to resolve customer phone for address sync:", profileError)
+  }
+
+  const resolvedAccountPhone = resolveCustomerPhone({
+    profilePhone: profileRow?.phone ?? null,
+    userMetadata: user.user_metadata,
+    authPhone: user.phone ?? null,
+  })
+
+  return normalizeOptionalString(getCheckoutPhoneValue(resolvedAccountPhone))
+}
 
 export const retrieveCustomer = cache(
   async (): Promise<CustomerProfile | null> => {
@@ -88,14 +135,13 @@ export async function updateCustomer(data: Partial<CustomerProfile>) {
     throw new Error("Not authenticated")
   }
 
-  const { email, ...metadataPatch } = data
+  const { email, phone: _ignoredPhone, ...metadataPatch } = data
   const normalizedEmail = email?.trim() || null
 
   const { error: updateError } = await supabase.auth.updateUser({
     data: {
       ...user.user_metadata,
       ...metadataPatch,
-      phone_number: data.phone || user.user_metadata?.phone_number,
     },
   })
 
@@ -165,6 +211,17 @@ export async function addCustomerAddress(
     address.is_default_billing = true
   }
 
+  if (address.is_default_billing) {
+    const immutableCustomerPhone = await resolveImmutableCustomerPhone(
+      supabase,
+      user
+    )
+
+    if (immutableCustomerPhone) {
+      address.phone = immutableCustomerPhone
+    }
+  }
+
   const { error } = await supabase.from("addresses").insert(address)
 
   if (error) {
@@ -182,26 +239,69 @@ export async function updateCustomerAddress(
 ) {
   const supabase = await createClient()
   const addressId = formData.get("addressId") as string
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: "Not authenticated" }
+  }
+
+  const { data: existingAddress, error: existingAddressError } = await supabase
+    .from("addresses")
+    .select("is_default_billing, is_default_shipping")
+    .eq("id", addressId)
+    .eq("user_id", user.id)
+    .maybeSingle<CustomerAddressFlagsRow>()
+
+  if (existingAddressError) {
+    return { success: false, error: existingAddressError.message }
+  }
+
+  if (!existingAddress) {
+    return { success: false, error: "Address not found" }
+  }
+
+  const nextIsDefaultBilling =
+    getBooleanFormValue(formData, "isDefaultBilling") ??
+    Boolean(existingAddress.is_default_billing)
+  const nextIsDefaultShipping =
+    getBooleanFormValue(formData, "isDefaultShipping") ??
+    Boolean(existingAddress.is_default_shipping)
 
   const address = {
-    first_name: formData.get("first_name") as string,
-    last_name: formData.get("last_name") as string,
-    company: formData.get("company") as string,
-    address_1: formData.get("address_1") as string,
-    address_2: formData.get("address_2") as string,
-    city: formData.get("city") as string,
-    country_code: formData.get("country_code") as string,
-    province: formData.get("province") as string,
-    postal_code: formData.get("postal_code") as string,
-    phone: formData.get("phone") as string,
-    is_default_billing: formData.get("isDefaultBilling") === "true",
-    is_default_shipping: formData.get("isDefaultShipping") === "true",
+    first_name: ((formData.get("first_name") as string) || "").trim(),
+    last_name: ((formData.get("last_name") as string) || "").trim(),
+    company: ((formData.get("company") as string) || "").trim(),
+    address_1: ((formData.get("address_1") as string) || "").trim(),
+    address_2: ((formData.get("address_2") as string) || "").trim(),
+    city: ((formData.get("city") as string) || "").trim(),
+    country_code: ((formData.get("country_code") as string) || "")
+      .trim()
+      .toLowerCase(),
+    province: ((formData.get("province") as string) || "").trim(),
+    postal_code: ((formData.get("postal_code") as string) || "").trim(),
+    phone: ((formData.get("phone") as string) || "").trim(),
+    is_default_billing: nextIsDefaultBilling,
+    is_default_shipping: nextIsDefaultShipping,
+  }
+
+  if (nextIsDefaultBilling) {
+    const immutableCustomerPhone = await resolveImmutableCustomerPhone(
+      supabase,
+      user
+    )
+
+    if (immutableCustomerPhone) {
+      address.phone = immutableCustomerPhone
+    }
   }
 
   const { error } = await supabase
     .from("addresses")
     .update(address)
     .eq("id", addressId)
+    .eq("user_id", user.id)
 
   if (error) {
     return { success: false, error: error.message }

@@ -62,6 +62,10 @@ export function isAddressValid(address: Address | null): boolean {
   )
 }
 
+function hasAddressPhone(address: Address | null): boolean {
+  return Boolean(address?.phone?.trim())
+}
+
 function areAddressesEqual(
   addressA: Address | null,
   addressB: Address | null
@@ -89,6 +93,17 @@ function inferShippingSameAsBilling(state: CheckoutState): boolean {
   return areAddressesEqual(state.shippingAddress, state.billingAddress)
 }
 
+function createSeparateShippingAddress(address: Address | null): Address | null {
+  if (!address) {
+    return null
+  }
+
+  return {
+    ...address,
+    phone: null,
+  }
+}
+
 function withMirroredShipping(state: CheckoutState): CheckoutState {
   if (!state.shippingSameAsBilling) {
     return state
@@ -107,8 +122,9 @@ function computeCheckoutValidity(state: CheckoutState): boolean {
   const normalizedState = withMirroredShipping(state)
   const hasValidBilling = isAddressValid(normalizedState.billingAddress)
   const hasValidShipping = normalizedState.shippingSameAsBilling
-    ? hasValidBilling
-    : isAddressValid(normalizedState.shippingAddress)
+    ? hasValidBilling && hasAddressPhone(normalizedState.shippingAddress)
+    : isAddressValid(normalizedState.shippingAddress) &&
+      hasAddressPhone(normalizedState.shippingAddress)
 
   return Boolean(
     normalizedState.email?.trim() &&
@@ -185,7 +201,9 @@ function checkoutReducer(
         shippingSameAsBilling,
         shippingAddress: shippingSameAsBilling
           ? state.billingAddress ?? state.shippingAddress
-          : state.shippingAddress ?? state.billingAddress,
+          : createSeparateShippingAddress(
+              state.shippingAddress ?? state.billingAddress
+            ),
       })
     }
 
