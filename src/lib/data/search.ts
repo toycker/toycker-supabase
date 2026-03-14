@@ -40,6 +40,16 @@ type SearchEntitiesArgs = {
     taxonomyLimit?: number
 }
 
+type SearchProductRow = {
+    id: string
+    name: string
+    handle: string
+    image_url: string | null
+    thumbnail: string | null
+    price: number
+    currency_code: string | null
+}
+
 export const searchEntities = async ({
     query,
     countryCode: _countryCode,
@@ -79,7 +89,7 @@ export const searchEntities = async ({
     ])
 
     // 2. Process results (Normalization)
-    const products = (productsRes.data || []).map((p: any) => ({
+    const products = ((productsRes.data || []) as SearchProductRow[]).map((p) => ({
         id: p.id,
         title: p.name,
         handle: p.handle,

@@ -1,6 +1,6 @@
 "use client"
 
-import { ProductVariant, VariantFormData } from "@/lib/supabase/types"
+import { Category, Collection, VariantFormData } from "@/lib/supabase/types"
 import { createProduct } from "@/lib/data/admin"
 import AdminCard from "./admin-card"
 import { SubmitButton } from "./submit-button"
@@ -15,10 +15,11 @@ import { COLOR_SWATCH_MAP, STANDARD_COLORS } from "@/lib/constants/colors"
 import CategoryCheckboxList from "./category-checkbox-list"
 import MediaGallery from "./media-manager"
 import { slugify } from "@/lib/util/slug"
+import { DEFAULT_MANUAL_PRODUCT_STATUS } from "@/lib/util/product-visibility"
 
 type NewProductFormProps = {
-  collections: any[]
-  categories: any[]
+  collections: Collection[]
+  categories: Category[]
 }
 
 export default function NewProductForm({ collections, categories }: NewProductFormProps) {
@@ -684,7 +685,7 @@ export default function NewProductForm({ collections, categories }: NewProductFo
       <div className="space-y-6">
         <AdminCard title="Visibility">
           <div className="space-y-4">
-            <select name="status" defaultValue="active" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-bold focus:border-black focus:ring-0 bg-white cursor-pointer">
+            <select name="status" defaultValue={DEFAULT_MANUAL_PRODUCT_STATUS} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-bold focus:border-black focus:ring-0 bg-white cursor-pointer">
               <option value="active">Active (Visible)</option>
               <option value="draft">Draft (Hidden)</option>
               <option value="archived">Archived</option>
