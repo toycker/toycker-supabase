@@ -6,6 +6,7 @@ import { Product } from "@/lib/supabase/types"
 import { SortOptions } from "@modules/store/components/refinement-list/types"
 
 import { normalizeProductImage } from "@lib/util/images"
+import { ACTIVE_PRODUCT_STATUS } from "@lib/util/product-visibility"
 
 const PRODUCT_SELECT = `
   *, 
@@ -49,6 +50,7 @@ export const listProducts = cache(async function listProducts(options: {
   let query = supabase
     .from("products")
     .select(selectString, { count: "exact" })
+    .eq("status", ACTIVE_PRODUCT_STATUS)
 
   if (options.queryParams?.collection_id?.length) {
     query = query.in("product_collections.collection_id", options.queryParams.collection_id)
@@ -95,6 +97,7 @@ export const getProductByHandle = cache(async function getProductByHandle(handle
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
+    .eq("status", ACTIVE_PRODUCT_STATUS)
     .eq("handle", handle)
     .maybeSingle()
 
@@ -109,7 +112,7 @@ export const listPaginatedProducts = cache(async function listPaginatedProducts(
   queryParams,
   priceFilter,
   availability,
-  ageFilter,
+  ageFilter: _ageFilter,
 }: {
   page?: number
   limit?: number
@@ -133,8 +136,6 @@ export const listPaginatedProducts = cache(async function listPaginatedProducts(
 
   const needsCategoryJoin = categoryIds.length > 0
   const needsCollectionJoin = collectionIds.length > 0
-  const needsPriceFilter = priceFilter?.min !== undefined || priceFilter?.max !== undefined
-
   // Build query with appropriate SELECT based on join requirements
   // When price filter is applied, we need to join variants to get accurate min price
   let query = needsCategoryJoin
@@ -148,6 +149,8 @@ export const listPaginatedProducts = cache(async function listPaginatedProducts(
         product_collections!inner(collection_id)
       `, { count: "exact" })
       : supabase.from("products").select(PRODUCT_SELECT, { count: "exact" })
+
+  query = query.eq("status", ACTIVE_PRODUCT_STATUS)
 
   // Chain filters WITHOUT recreating the query object
   if (needsCategoryJoin) {

@@ -27,6 +27,9 @@ import { PERMISSIONS } from "@/lib/permissions"
 import { getCustomerFacingEmail } from "@/lib/util/customer-email"
 import { resolveCustomerPhone } from "@/lib/util/customer-contact-phone"
 import { canEditOrderShippingAddress } from "@/lib/util/order-shipping-address-edit"
+import {
+  DEFAULT_MANUAL_PRODUCT_STATUS,
+} from "@/lib/util/product-visibility"
 
 type EmailBackedRow = {
   email: string | null
@@ -72,6 +75,27 @@ function buildOrderShippingAddress(formData: FormData): Address {
     postal_code: getTrimmedFormValue(formData, "postal_code") || null,
     phone: getTrimmedFormValue(formData, "phone") || null,
   }
+}
+
+function revalidateStorefrontProductPaths(handles: Array<string | null | undefined>) {
+  const uniqueHandles = Array.from(
+    new Set(
+      handles.filter((handle): handle is string => Boolean(handle?.trim()))
+    )
+  )
+
+  revalidatePath("/")
+  revalidatePath("/store")
+  revalidatePath("/collections")
+  revalidatePath("/categories")
+  revalidatePath("/products/[handle]", "page")
+  revalidatePath("/collections/[handle]", "page")
+  revalidatePath("/categories/[...category]", "page")
+  revalidateTag("products", "max")
+
+  uniqueHandles.forEach((handle) => {
+    revalidatePath(`/products/${handle}`)
+  })
 }
 
 export type AdminOrder = Order & {
@@ -788,7 +812,9 @@ export async function createProduct(formData: FormData) {
         ? primaryCollectionId
         : null, // Set primary collection
     category_id: primaryCategoryId, // Set category
-    status: (formData.get("status") as string) || "active",
+    status:
+      (formData.get("status") as Product["status"] | null) ||
+      DEFAULT_MANUAL_PRODUCT_STATUS,
     currency_code: "inr",
     metadata: {
       compare_at_price: compareAtPrice,
@@ -811,7 +837,7 @@ export async function createProduct(formData: FormData) {
   const { data: newProduct, error } = await supabase
     .from("products")
     .insert(product)
-    .select("id")
+    .select("id, handle")
     .single()
 
   if (error) throw new Error(error.message)
@@ -862,6 +888,7 @@ export async function createProduct(formData: FormData) {
   }
 
   revalidatePath("/admin/products")
+  revalidateStorefrontProductPaths([newProduct?.handle])
   redirect("/admin/products")
 }
 
@@ -910,10 +937,19 @@ export async function updateProduct(formData: FormData) {
 
   const newImageUrl = formData.get("image_url") as string
   const imageUrlChanged = newImageUrl !== currentProduct?.image_url
+  const updatedHandle = formData.get("handle") as string
 
-  const updates: any = {
+  const metadata = {
+    ...(currentProduct?.metadata || {}),
+    compare_at_price: formData.get("compare_at_price")
+      ? parseFloat(formData.get("compare_at_price") as string)
+      : currentProduct?.metadata?.compare_at_price || null,
+  }
+  delete metadata.short_description
+
+  const updates: Record<string, unknown> & { handle: string } = {
     name: formData.get("name") as string,
-    handle: formData.get("handle") as string,
+    handle: updatedHandle,
     description: formData.get("description") as string,
     price: productPrice,
     stock_count: productStockCount,
@@ -923,18 +959,8 @@ export async function updateProduct(formData: FormData) {
         ? primaryCollectionId
         : null, // Update primary collection
     category_id: primaryCategoryId, // Update category
-    status: formData.get("status") as string,
-    metadata: (() => {
-      const meta = {
-        ...(currentProduct?.metadata || {}),
-        compare_at_price: formData.get("compare_at_price")
-          ? parseFloat(formData.get("compare_at_price") as string)
-          : currentProduct?.metadata?.compare_at_price || null,
-      }
-      // Remove short_description from metadata to ensure the main column is the source of truth
-      delete meta.short_description
-      return meta
-    })(),
+    status: formData.get("status") as Product["status"],
+    metadata,
     short_description: formData.get("short_description") as string,
     video_url: formData.get("video_url") as string,
     images: formData.get("images_json")
@@ -1021,7 +1047,7 @@ export async function updateProduct(formData: FormData) {
 
   revalidatePath("/admin/products")
   revalidatePath(`/admin/products/${id}`)
-  revalidatePath(`/products/${updates.handle || currentProduct?.handle}`)
+  revalidateStorefrontProductPaths([currentProduct?.handle, updatedHandle])
   redirect(`/admin/products/${id}`)
 }
 
@@ -1060,11 +1086,21 @@ export async function deleteProduct(id: string, redirectTo?: string) {
   await requirePermission(PERMISSIONS.PRODUCTS_DELETE)
   const supabase = await createClient()
 
+  const { data: existingProduct, error: existingProductError } = await supabase
+    .from("products")
+    .select("handle")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (existingProductError) throw existingProductError
+
   const { error } = await supabase.from("products").delete().eq("id", id)
   if (error) throw error
 
   revalidatePath("/admin/products")
+  revalidatePath(`/admin/products/${id}`)
   revalidatePath("/admin/inventory")
+  revalidateStorefrontProductPaths([existingProduct?.handle ?? null])
 
   if (redirectTo) {
     redirect(redirectTo)

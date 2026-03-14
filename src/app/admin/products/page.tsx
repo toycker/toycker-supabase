@@ -2,7 +2,6 @@ import { getAdminProducts } from "@/lib/data/admin"
 import Link from "next/link"
 import Image from "next/image"
 import {
-  PlusIcon,
   PencilIcon,
   TagIcon,
   ArrowTopRightOnSquareIcon,
@@ -21,6 +20,7 @@ import { PERMISSIONS } from "@/lib/permissions"
 import { ClickableTableRow } from "@modules/admin/components/clickable-table-row"
 import { CreateProductButton } from "./create-product-button"
 import { AdminTableWrapper } from "@modules/admin/components/admin-table-wrapper"
+import { isStorefrontVisibleProduct } from "@lib/util/product-visibility"
 
 export default async function AdminProducts({
   searchParams,
@@ -218,14 +218,23 @@ export default async function AdminProducts({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-1 relative z-20">
-                        <a
-                          href={`/products/${product.handle}`}
-                          target="_blank"
-                          className="p-2 text-gray-400 hover:text-black transition-colors"
-                          title="Preview store"
-                        >
-                          <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                        </a>
+                        {isStorefrontVisibleProduct(product.status) ? (
+                          <a
+                            href={`/products/${product.handle}`}
+                            target="_blank"
+                            className="p-2 text-gray-400 hover:text-black transition-colors"
+                            title="Preview store"
+                          >
+                            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <span
+                            className="p-2 text-gray-300 rounded-lg cursor-not-allowed"
+                            title="Only active products are visible in store."
+                          >
+                            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                          </span>
+                        )}
                         <ProtectedAction
                           permission={PERMISSIONS.PRODUCTS_UPDATE}
                           hideWhenDisabled

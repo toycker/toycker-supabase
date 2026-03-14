@@ -20,6 +20,8 @@ import { useState, useMemo } from "react"
 import { getYoutubeId, getYoutubeEmbedUrl } from "@/lib/util/youtube"
 import { Tag, Globe, Layers, Edit2, Link2, Link2Off } from "lucide-react"
 import { slugify } from "@/lib/util/slug"
+import DeleteProductButton from "./delete-product-button"
+import { isStorefrontVisibleProduct } from "@/lib/util/product-visibility"
 
 type EditProductFormProps = {
   product: Product
@@ -51,6 +53,13 @@ export default function EditProductForm({
   const [handle, setHandle] = useState(product.handle)
   const [isEditingHandle, setIsEditingHandle] = useState(false)
   const [isHandleManuallyEdited, setIsHandleManuallyEdited] = useState(false)
+  const canViewInStore = isStorefrontVisibleProduct(product.status)
+  const storefrontStatusMessage =
+    product.status === "active"
+      ? "This product is live on your storefront."
+      : product.status === "draft"
+        ? "This product is hidden from customers until you mark it active."
+        : "This product is archived and hidden from customers."
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value
@@ -138,15 +147,25 @@ export default function EditProductForm({
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
-            <a
-              href={`/products/${product.handle}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-bold rounded-lg hover:bg-white hover:border-gray-400 transition-all"
-            >
-              <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-              View in store
-            </a>
+            {canViewInStore ? (
+              <a
+                href={`/products/${product.handle}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-bold rounded-lg hover:bg-white hover:border-gray-400 transition-all"
+              >
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                View in store
+              </a>
+            ) : (
+              <span
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-bold text-gray-400 rounded-lg cursor-not-allowed"
+                title="Only active products can be viewed in store."
+              >
+                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                View in store
+              </span>
+            )}
             <SubmitButton className="inline-flex items-center px-5 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-all shadow-sm">
               Save Product
             </SubmitButton>
@@ -380,7 +399,7 @@ export default function EditProductForm({
         <div className="space-y-6">
           <AdminCard title="Status & Visibility">
             <div className="space-y-4">
-              <p className="text-xs text-gray-500 font-medium leading-relaxed">This product is currently <span className="font-bold text-black uppercase">{product.status}</span> on your storefront.</p>
+              <p className="text-xs text-gray-500 font-medium leading-relaxed">{storefrontStatusMessage}</p>
               <select name="status" defaultValue={product.status || "active"} className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-bold focus:border-black focus:ring-0 bg-white">
                 <option value="active">Active</option>
                 <option value="draft">Draft</option>
@@ -471,15 +490,32 @@ export default function EditProductForm({
 
       {/* Submit buttons restored to the bottom of the form */}
       <div className="flex justify-end gap-2 mt-6">
-        <a
-          href={`/products/${product.handle}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-bold rounded-lg hover:bg-white hover:border-gray-400 transition-all"
-        >
-          <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-          View in store
-        </a>
+        {canViewInStore ? (
+          <a
+            href={`/products/${product.handle}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-bold rounded-lg hover:bg-white hover:border-gray-400 transition-all"
+          >
+            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+            View in store
+          </a>
+        ) : (
+          <span
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-bold text-gray-400 rounded-lg cursor-not-allowed"
+            title="Only active products can be viewed in store."
+          >
+            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+            View in store
+          </span>
+        )}
+        <ProtectedAction permission={PERMISSIONS.PRODUCTS_DELETE} hideWhenDisabled>
+          <DeleteProductButton
+            productId={product.id}
+            productName={product.name}
+            redirectTo="/admin/products"
+          />
+        </ProtectedAction>
         <ProtectedAction permission={PERMISSIONS.PRODUCTS_UPDATE} hideWhenDisabled>
           <SubmitButton className="inline-flex items-center px-5 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-all shadow-sm">
             Save Product
