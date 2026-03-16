@@ -1,13 +1,18 @@
 "use client"
 
 import { RadioGroup } from "@headlessui/react"
-import { isStripeLike, paymentInfoMap } from "@lib/constants"
+import {
+  getPaymentMethodBadgeLabel,
+  isStripeLike,
+  isTemporarilyDisabledPaymentMethod,
+  paymentInfoMap,
+} from "@lib/constants"
 import { Text } from "@modules/common/components/text"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import PaymentContainer, {
   StripeCardContainer,
 } from "@modules/checkout/components/payment-container"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Cart } from "@/lib/supabase/types"
 import { useCheckout } from "../../context/checkout-context"
 
@@ -22,20 +27,36 @@ const Payment = ({
 
   const [error, setError] = useState<string | null>(null)
 
-
   const paidByGiftcard = (cart.gift_card_total ?? 0) > 0 && cart.total === 0
+  const selectedPaymentMethod = isTemporarilyDisabledPaymentMethod(
+    state.paymentMethod
+  )
+    ? null
+    : state.paymentMethod
+  const enabledPaymentMethods = useMemo(
+    () =>
+      availablePaymentMethods.filter(
+        (paymentMethod) =>
+          !isTemporarilyDisabledPaymentMethod(paymentMethod.id)
+      ),
+    [availablePaymentMethods]
+  )
 
-  // Auto-select first payment method if none selected
+  // Auto-select the first enabled payment method when nothing selectable is set.
   useEffect(() => {
-    if (!state.paymentMethod && availablePaymentMethods?.length && !paidByGiftcard) {
-      const firstMethod = availablePaymentMethods[0]
+    if (!selectedPaymentMethod && enabledPaymentMethods.length && !paidByGiftcard) {
+      const firstMethod = enabledPaymentMethods[0]
       if (firstMethod) {
         setPaymentMethod(firstMethod.id)
       }
     }
-  }, [availablePaymentMethods, state.paymentMethod, paidByGiftcard, setPaymentMethod])
+  }, [enabledPaymentMethods, selectedPaymentMethod, paidByGiftcard, setPaymentMethod])
 
   const handlePaymentMethodChange = (method: string) => {
+    if (isTemporarilyDisabledPaymentMethod(method)) {
+      return
+    }
+
     setError(null)
     setPaymentMethod(method)
   }
@@ -55,7 +76,7 @@ const Payment = ({
       <div>
         {!paidByGiftcard && availablePaymentMethods?.length ? (
           <RadioGroup
-            value={state.paymentMethod || ""}
+            value={selectedPaymentMethod || ""}
             onChange={handlePaymentMethodChange}
           >
             {availablePaymentMethods.map((paymentMethod) => (
@@ -63,8 +84,10 @@ const Payment = ({
                 {isStripeLike(paymentMethod.id) ? (
                   <StripeCardContainer
                     paymentProviderId={paymentMethod.id}
-                    selectedPaymentOptionId={state.paymentMethod || ""}
+                    selectedPaymentOptionId={selectedPaymentMethod || ""}
                     paymentInfoMap={paymentInfoMap}
+                    disabled={isTemporarilyDisabledPaymentMethod(paymentMethod.id)}
+                    badgeLabel={getPaymentMethodBadgeLabel(paymentMethod.id)}
                     setCardBrand={() => { }}
                     setError={setError}
                     setCardComplete={() => { }}
@@ -73,7 +96,9 @@ const Payment = ({
                   <PaymentContainer
                     paymentInfoMap={paymentInfoMap}
                     paymentProviderId={paymentMethod.id}
-                    selectedPaymentOptionId={state.paymentMethod || ""}
+                    selectedPaymentOptionId={selectedPaymentMethod || ""}
+                    disabled={isTemporarilyDisabledPaymentMethod(paymentMethod.id)}
+                    badgeLabel={getPaymentMethodBadgeLabel(paymentMethod.id)}
                   />
                 )}
               </div>

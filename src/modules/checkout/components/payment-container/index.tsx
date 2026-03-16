@@ -14,6 +14,7 @@ type PaymentContainerProps = {
   paymentProviderId: string
   selectedPaymentOptionId: string | null
   disabled?: boolean
+  badgeLabel?: string | null
   paymentInfoMap: Record<
     string,
     { title: string; icon: JSX.Element; description?: string }
@@ -26,6 +27,7 @@ const PaymentContainer: React.FC<PaymentContainerProps> = ({
   selectedPaymentOptionId,
   paymentInfoMap,
   disabled = false,
+  badgeLabel = null,
   children,
 }) => {
   const isSelected = selectedPaymentOptionId === paymentProviderId
@@ -35,22 +37,32 @@ const PaymentContainer: React.FC<PaymentContainerProps> = ({
       key={paymentProviderId}
       value={paymentProviderId}
       disabled={disabled}
+      aria-disabled={disabled}
+      data-testid={`payment-option-${paymentProviderId}`}
       className={cn(
-        "group flex flex-col cursor-pointer border rounded-xl overflow-hidden transition-all duration-200 mb-4",
+        "group flex flex-col border rounded-xl overflow-hidden transition-all duration-200 mb-4",
         {
-          "border-blue-600 bg-blue-50/30 shadow-sm": isSelected,
-          "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm": !isSelected,
+          "cursor-not-allowed border-gray-200 bg-gray-50/80 opacity-70": disabled,
+          "cursor-pointer border-blue-600 bg-blue-50/30 shadow-sm": isSelected && !disabled,
+          "cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm": !isSelected && !disabled,
         }
       )}
     >
       {/* Payment Method Header */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center gap-3 sm:gap-4 flex-1">
-          <Radio checked={isSelected} />
+          <Radio checked={isSelected} disabled={disabled} />
           <div className="flex flex-col">
-            <Text className="text-sm sm:text-base font-semibold text-gray-900">
-              {paymentInfoMap[paymentProviderId]?.title || paymentProviderId}
-            </Text>
+            <div className="flex flex-wrap items-center gap-2">
+              <Text className="text-sm sm:text-base font-semibold text-gray-900">
+                {paymentInfoMap[paymentProviderId]?.title || paymentProviderId}
+              </Text>
+              {badgeLabel && (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                  {badgeLabel}
+                </span>
+              )}
+            </div>
             {paymentInfoMap[paymentProviderId]?.description && (
               <Text className="text-xs sm:text-sm text-gray-500 mt-0.5 leading-snug">
                 {paymentInfoMap[paymentProviderId]?.description}
@@ -58,8 +70,16 @@ const PaymentContainer: React.FC<PaymentContainerProps> = ({
             )}
           </div>
         </div>
-        <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors">
-          <span className="text-gray-600">
+        <div
+          className={cn(
+            "flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg transition-colors",
+            {
+              "bg-gray-100": disabled,
+              "bg-gray-50 group-hover:bg-gray-100": !disabled,
+            }
+          )}
+        >
+          <span className={cn("text-gray-600", { "text-gray-400": disabled })}>
             {paymentInfoMap[paymentProviderId]?.icon}
           </span>
         </div>
@@ -84,6 +104,7 @@ export const StripeCardContainer = ({
   selectedPaymentOptionId,
   paymentInfoMap,
   disabled = false,
+  badgeLabel = null,
   setCardBrand,
   setError,
   setCardComplete,
@@ -118,6 +139,7 @@ export const StripeCardContainer = ({
       selectedPaymentOptionId={selectedPaymentOptionId}
       paymentInfoMap={paymentInfoMap}
       disabled={disabled}
+      badgeLabel={badgeLabel}
     >
       {selectedPaymentOptionId === paymentProviderId &&
         (stripeReady ? (

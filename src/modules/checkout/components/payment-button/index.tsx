@@ -1,6 +1,11 @@
 "use client"
 
-import { isManual, isStripeLike, isPayU } from "@lib/constants"
+import {
+  isManual,
+  isPayU,
+  isStripeLike,
+  isTemporarilyDisabledPaymentMethod,
+} from "@lib/constants"
 import { Button } from "@modules/common/components/button"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { useCheckout } from "@modules/checkout/context/checkout-context"
@@ -20,12 +25,17 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   "data-testid": dataTestId,
 }) => {
   const { state } = useCheckout()
+  const selectedPaymentMethod = isTemporarilyDisabledPaymentMethod(
+    state.paymentMethod
+  )
+    ? undefined
+    : state.paymentMethod ?? undefined
 
   // Check if all required data is filled
   const notReady = !state.isValid
 
   switch (true) {
-    case isStripeLike(state.paymentMethod ?? undefined):
+    case isStripeLike(selectedPaymentMethod):
       return (
         <StripePaymentButton
           notReady={notReady}
@@ -33,7 +43,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
           data-testid={dataTestId}
         />
       )
-    case isManual(state.paymentMethod ?? undefined):
+    case isManual(selectedPaymentMethod):
       return (
         <ManualTestPaymentButton
           notReady={notReady}
@@ -41,7 +51,7 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
           data-testid={dataTestId}
         />
       )
-    case isPayU(state.paymentMethod ?? undefined):
+    case isPayU(selectedPaymentMethod):
       return (
         <PayUPaymentButton
           notReady={notReady}

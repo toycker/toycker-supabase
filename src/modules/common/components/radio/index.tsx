@@ -1,6 +1,14 @@
 import { cn } from "@lib/util/cn"
 
-const Radio = ({ checked, 'data-testid': dataTestId }: { checked: boolean, 'data-testid'?: string }) => {
+const Radio = ({
+  checked,
+  disabled = false,
+  'data-testid': dataTestId,
+}: {
+  checked: boolean
+  disabled?: boolean
+  'data-testid'?: string
+}) => {
   return (
     <div className="relative flex items-center">
       <div
@@ -9,7 +17,8 @@ const Radio = ({ checked, 'data-testid': dataTestId }: { checked: boolean, 'data
           "flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-200",
           {
             "border-blue-600 bg-white": checked,
-            "border-gray-300 bg-white hover:border-gray-400": !checked,
+            "border-gray-200 bg-gray-100": disabled && !checked,
+            "border-gray-300 bg-white hover:border-gray-400": !checked && !disabled,
           }
         )}
       >

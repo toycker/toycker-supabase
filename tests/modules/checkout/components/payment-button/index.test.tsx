@@ -104,24 +104,14 @@ describe("PaymentButton", () => {
     pushMock.mockReset()
   })
 
-  it("shows an error and does not navigate when PayU payload is missing", async () => {
-    completeCheckoutMock.mockResolvedValue({
-      success: true,
-      orderId: "order-1",
-      paymentData: null,
-    })
-
+  it("keeps the submit action disabled when the selected payment method is temporarily unavailable", async () => {
     render(<PaymentButton cart={cart} data-testid="payment-button" />)
 
-    fireEvent.click(screen.getByTestId("payment-button"))
-
     await waitFor(() => {
-      expect(completeCheckoutMock).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole("button", { name: "Select a payment method" })).toBeDisabled()
     })
 
+    expect(completeCheckoutMock).not.toHaveBeenCalled()
     expect(pushMock).not.toHaveBeenCalled()
-    expect(
-      await screen.findByText("Unable to start PayU payment. Please try again.")
-    ).toBeInTheDocument()
   })
 })

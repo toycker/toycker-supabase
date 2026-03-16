@@ -22,6 +22,33 @@ export const paymentInfoMap: Record<
   },
 }
 
+const temporarilyDisabledPaymentMethods: Record<
+  string,
+  { badgeLabel: string }
+> = {
+  pp_payu_payu: {
+    badgeLabel: "Coming Soon",
+  },
+}
+
+export const isTemporarilyDisabledPaymentMethod = (
+  providerId?: string | null
+) => {
+  if (!providerId) {
+    return false
+  }
+
+  return providerId in temporarilyDisabledPaymentMethods
+}
+
+export const getPaymentMethodBadgeLabel = (providerId?: string | null) => {
+  if (!providerId) {
+    return null
+  }
+
+  return temporarilyDisabledPaymentMethods[providerId]?.badgeLabel ?? null
+}
+
 // This only checks if it is native stripe
 export const isStripeLike = (providerId?: string) => {
   return providerId?.startsWith("pp_stripe_")

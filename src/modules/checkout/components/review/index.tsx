@@ -1,6 +1,7 @@
 "use client"
 
 import { Cart } from "@/lib/supabase/types"
+import { isTemporarilyDisabledPaymentMethod } from "@lib/constants"
 import { Lock, AlertCircle } from "lucide-react"
 
 import PaymentButton from "../payment-button"
@@ -23,7 +24,10 @@ const Review = ({ cart }: { cart: CartWithGiftCards }) => {
     : isAddressValid(state.shippingAddress)
   const hasAddress = shippingAddressValid && billingAddressValid
   const hasShipping = Boolean(cart.shipping_methods?.length) || true // Assuming default shipping
-  const hasPayment = Boolean(state.paymentMethod) || paidByGiftcard
+  const hasPayment =
+    (Boolean(state.paymentMethod) &&
+      !isTemporarilyDisabledPaymentMethod(state.paymentMethod)) ||
+    paidByGiftcard
 
   const isReady = hasAddress && hasShipping && hasPayment
 
