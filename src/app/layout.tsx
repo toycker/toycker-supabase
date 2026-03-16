@@ -3,6 +3,7 @@ import { Metadata } from "next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 import { Analytics as GTMAnalytics } from "@lib/analytics"
+import MetaPixel from "@lib/analytics/meta-pixel"
 import NextTopLoader from "nextjs-toploader"
 import Providers from "./providers"
 import { grandstander, inter } from "@lib/fonts"
@@ -38,6 +39,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
           {props.children}
           <PWAClientWrapper />
         </Providers>
+        <MetaPixel />
         <SpeedInsights />
         <Analytics />
       </body>
