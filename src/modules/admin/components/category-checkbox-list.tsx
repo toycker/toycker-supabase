@@ -13,14 +13,12 @@ interface CategoryCheckboxListProps {
   categories: Category[]
   selectedIds: string[]
   name: string
-  defaultVisibleCount?: number
 }
 
 export default function CategoryCheckboxList({
   categories,
   selectedIds,
-  name,
-  defaultVisibleCount
+  name
 }: CategoryCheckboxListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentSelectedIds, setCurrentSelectedIds] = useState<string[]>(selectedIds)
@@ -38,10 +36,6 @@ export default function CategoryCheckboxList({
     )
   }
 
-  const selectedIdSet = useMemo(() => {
-    return new Set(currentSelectedIds)
-  }, [currentSelectedIds])
-
   const filteredCategories = useMemo(() => {
     return categories.filter(c =>
       c.name.toLowerCase().includes(normalizedQuery) ||
@@ -54,25 +48,12 @@ export default function CategoryCheckboxList({
       return filteredCategories
     }
 
-    if (typeof defaultVisibleCount !== "number") {
-      return categories
-    }
-
-    return categories.filter((category, index) => {
-      return index < defaultVisibleCount || selectedIdSet.has(category.id)
-    })
+    return categories
   }, [
     categories,
-    defaultVisibleCount,
     filteredCategories,
     normalizedQuery,
-    selectedIdSet,
   ])
-
-  const overflowSelectedCount = Math.max(
-    visibleCategories.length - Math.min(defaultVisibleCount ?? categories.length, categories.length),
-    0
-  )
 
   return (
     <div className="space-y-4">
@@ -89,13 +70,9 @@ export default function CategoryCheckboxList({
         </div>
       )}
 
-      {((typeof defaultVisibleCount === "number" && categories.length > defaultVisibleCount) || normalizedQuery) && (
+      {normalizedQuery && (
         <p className="text-[10px] font-medium text-gray-400">
-          {normalizedQuery
-            ? `Showing ${visibleCategories.length} matching result${visibleCategories.length === 1 ? "" : "s"}.`
-            : overflowSelectedCount > 0
-              ? `Showing first ${Math.min(defaultVisibleCount ?? categories.length, categories.length)} of ${categories.length}. ${overflowSelectedCount} selected item${overflowSelectedCount === 1 ? "" : "s"} kept visible.`
-              : `Showing first ${Math.min(defaultVisibleCount ?? categories.length, categories.length)} of ${categories.length}. Search to find more.`}
+          {`Showing ${visibleCategories.length} matching result${visibleCategories.length === 1 ? "" : "s"}.`}
         </p>
       )}
 
