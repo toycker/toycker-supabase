@@ -6,14 +6,12 @@ interface CollectionCheckboxListProps {
   collections: Array<Collection & { handle?: string | null }>
   selectedIds: string[]
   name: string
-  defaultVisibleCount?: number
 }
 
 export default function CollectionCheckboxList({
   collections,
   selectedIds,
-  name,
-  defaultVisibleCount
+  name
 }: CollectionCheckboxListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentSelectedIds, setCurrentSelectedIds] = useState<string[]>(selectedIds)
@@ -31,10 +29,6 @@ export default function CollectionCheckboxList({
     )
   }
 
-  const selectedIdSet = useMemo(() => {
-    return new Set(currentSelectedIds)
-  }, [currentSelectedIds])
-
   const filteredCollections = useMemo(() => {
     return collections.filter(c =>
       c.title.toLowerCase().includes(normalizedQuery) ||
@@ -47,25 +41,12 @@ export default function CollectionCheckboxList({
       return filteredCollections
     }
 
-    if (typeof defaultVisibleCount !== "number") {
-      return collections
-    }
-
-    return collections.filter((collection, index) => {
-      return index < defaultVisibleCount || selectedIdSet.has(collection.id)
-    })
+    return collections
   }, [
     collections,
-    defaultVisibleCount,
     filteredCollections,
     normalizedQuery,
-    selectedIdSet,
   ])
-
-  const overflowSelectedCount = Math.max(
-    visibleCollections.length - Math.min(defaultVisibleCount ?? collections.length, collections.length),
-    0
-  )
 
   return (
     <div className="space-y-4">
@@ -82,13 +63,9 @@ export default function CollectionCheckboxList({
         </div>
       )}
 
-      {((typeof defaultVisibleCount === "number" && collections.length > defaultVisibleCount) || normalizedQuery) && (
+      {normalizedQuery && (
         <p className="text-[10px] font-medium text-gray-400">
-          {normalizedQuery
-            ? `Showing ${visibleCollections.length} matching result${visibleCollections.length === 1 ? "" : "s"}.`
-            : overflowSelectedCount > 0
-              ? `Showing first ${Math.min(defaultVisibleCount ?? collections.length, collections.length)} of ${collections.length}. ${overflowSelectedCount} selected item${overflowSelectedCount === 1 ? "" : "s"} kept visible.`
-              : `Showing first ${Math.min(defaultVisibleCount ?? collections.length, collections.length)} of ${collections.length}. Search to find more.`}
+          {`Showing ${visibleCollections.length} matching result${visibleCollections.length === 1 ? "" : "s"}.`}
         </p>
       )}
 

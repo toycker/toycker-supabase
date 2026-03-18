@@ -749,7 +749,6 @@ export default function NewProductForm({ collections, categories }: NewProductFo
                 categories={categories}
                 selectedIds={[]}
                 name="category_ids"
-                defaultVisibleCount={20}
               />
             </div>
 
@@ -762,7 +761,6 @@ export default function NewProductForm({ collections, categories }: NewProductFo
                 collections={collections}
                 selectedIds={[]}
                 name="collection_ids"
-                defaultVisibleCount={20}
               />
             </div>
           </div>
