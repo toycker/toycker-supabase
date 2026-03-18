@@ -29,21 +29,29 @@ function buildCollections(count = 25): Collection[] {
 }
 
 describe("CategoryCheckboxList", () => {
-  it("shows 20 by default and searches across the full category dataset", () => {
+  it("shows all categories by default", () => {
     render(
       <CategoryCheckboxList
         categories={buildCategories()}
         selectedIds={[]}
         name="category_ids"
-        defaultVisibleCount={20}
       />
     )
 
+    expect(screen.getByText("Category 25")).toBeInTheDocument()
     expect(
-      screen.getByText("Showing first 20 of 25. Search to find more.")
-    ).toBeInTheDocument()
-    expect(screen.getByText("Category 20")).toBeInTheDocument()
-    expect(screen.queryByText("Category 21")).not.toBeInTheDocument()
+      screen.queryByText("Showing 1 matching result.")
+    ).not.toBeInTheDocument()
+  })
+
+  it("filters categories and shows match count during search", () => {
+    render(
+      <CategoryCheckboxList
+        categories={buildCategories()}
+        selectedIds={[]}
+        name="category_ids"
+      />
+    )
 
     fireEvent.change(screen.getByPlaceholderText("Search categories..."), {
       target: { value: "category-25" },
@@ -52,59 +60,32 @@ describe("CategoryCheckboxList", () => {
     expect(screen.getByText("Category 25")).toBeInTheDocument()
     expect(screen.getByText("Showing 1 matching result.")).toBeInTheDocument()
   })
-
-  it("keeps selected categories outside the default 20 visible", () => {
-    render(
-      <CategoryCheckboxList
-        categories={buildCategories()}
-        selectedIds={["cat-25"]}
-        name="category_ids"
-        defaultVisibleCount={20}
-      />
-    )
-
-    expect(screen.getByText("Category 20")).toBeInTheDocument()
-    expect(screen.queryByText("Category 21")).not.toBeInTheDocument()
-    expect(screen.getByText("Category 25")).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        "Showing first 20 of 25. 1 selected item kept visible."
-      )
-    ).toBeInTheDocument()
-  })
-
-  it("shows all categories by default when no visibility limit is provided", () => {
-    render(
-      <CategoryCheckboxList
-        categories={buildCategories()}
-        selectedIds={[]}
-        name="category_ids"
-      />
-    )
-
-    expect(screen.getByText("Category 25")).toBeInTheDocument()
-    expect(
-      screen.queryByText("Showing first 20 of 25. Search to find more.")
-    ).not.toBeInTheDocument()
-  })
 })
 
 describe("CollectionCheckboxList", () => {
-  it("shows 20 by default and searches across the full collection dataset", () => {
+  it("shows all collections by default", () => {
     render(
       <CollectionCheckboxList
         collections={buildCollections()}
         selectedIds={[]}
         name="collection_ids"
-        defaultVisibleCount={20}
       />
     )
 
+    expect(screen.getByText("Collection 25")).toBeInTheDocument()
     expect(
-      screen.getByText("Showing first 20 of 25. Search to find more.")
-    ).toBeInTheDocument()
-    expect(screen.getByText("Collection 20")).toBeInTheDocument()
-    expect(screen.queryByText("Collection 21")).not.toBeInTheDocument()
+      screen.queryByText("Showing 1 matching result.")
+    ).not.toBeInTheDocument()
+  })
+
+  it("filters collections and shows match count during search", () => {
+    render(
+      <CollectionCheckboxList
+        collections={buildCollections()}
+        selectedIds={[]}
+        name="collection_ids"
+      />
+    )
 
     fireEvent.change(screen.getByPlaceholderText("Search collections..."), {
       target: { value: "collection-25" },
@@ -112,40 +93,5 @@ describe("CollectionCheckboxList", () => {
 
     expect(screen.getByText("Collection 25")).toBeInTheDocument()
     expect(screen.getByText("Showing 1 matching result.")).toBeInTheDocument()
-  })
-
-  it("keeps selected collections outside the default 20 visible", () => {
-    render(
-      <CollectionCheckboxList
-        collections={buildCollections()}
-        selectedIds={["col-25"]}
-        name="collection_ids"
-        defaultVisibleCount={20}
-      />
-    )
-
-    expect(screen.getByText("Collection 20")).toBeInTheDocument()
-    expect(screen.queryByText("Collection 21")).not.toBeInTheDocument()
-    expect(screen.getByText("Collection 25")).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        "Showing first 20 of 25. 1 selected item kept visible."
-      )
-    ).toBeInTheDocument()
-  })
-
-  it("shows all collections by default when no visibility limit is provided", () => {
-    render(
-      <CollectionCheckboxList
-        collections={buildCollections()}
-        selectedIds={[]}
-        name="collection_ids"
-      />
-    )
-
-    expect(screen.getByText("Collection 25")).toBeInTheDocument()
-    expect(
-      screen.queryByText("Showing first 20 of 25. Search to find more.")
-    ).not.toBeInTheDocument()
   })
 })

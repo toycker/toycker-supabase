@@ -852,7 +852,15 @@ export async function getAdminProducts(
   }
 }
 
-export async function createProduct(formData: FormData) {
+type ProductActionState = {
+  success: boolean
+  error: string | null
+}
+
+export async function createProduct(
+  _currentState: ProductActionState,
+  formData: FormData
+): Promise<ProductActionState> {
   await ensureAdmin()
   await requirePermission(PERMISSIONS.PRODUCTS_CREATE)
   const supabase = await createClient()
@@ -942,7 +950,29 @@ export async function createProduct(formData: FormData) {
     .select("id, handle")
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    const message = (error as { message?: string }).message || ""
+    const code = (error as { code?: string }).code
+    const normalizedMessage = message.toLowerCase()
+    const isDuplicate =
+      code === "23505" ||
+      normalizedMessage.includes("products_handle_key") ||
+      normalizedMessage.includes("duplicate key")
+
+    if (isDuplicate) {
+      return {
+        success: false,
+        error:
+          "A product with this title or handle already exists. Please change the title or handle.",
+      }
+    }
+
+    console.error("Failed to create product:", error)
+    return {
+      success: false,
+      error: "Failed to create product. Please try again.",
+    }
+  }
 
   // Create variants
   if (newProduct) {
@@ -992,6 +1022,8 @@ export async function createProduct(formData: FormData) {
   revalidatePath("/admin/products")
   revalidateStorefrontProductPaths([newProduct?.handle])
   redirect("/admin/products")
+
+  return { success: true, error: null }
 }
 
 export async function updateProduct(formData: FormData) {

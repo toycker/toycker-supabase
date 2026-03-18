@@ -7,7 +7,7 @@ import { SubmitButton } from "./submit-button"
 import RichTextEditor from "./rich-text-editor"
 import CollectionCheckboxList from "./collection-checkbox-list"
 import { TrashIcon, PlusIcon, Layers, Package, Tag, Globe, Edit2, Sparkles, ChevronDown, Link2, Link2Off } from "lucide-react"
-import { useState } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { cn } from "@lib/util/cn"
 import { getYoutubeId, getYoutubeEmbedUrl } from "@/lib/util/youtube"
 import { PhotoIcon } from "@heroicons/react/24/outline"
@@ -16,6 +16,7 @@ import CategoryCheckboxList from "./category-checkbox-list"
 import MediaGallery from "./media-manager"
 import { slugify } from "@/lib/util/slug"
 import { DEFAULT_MANUAL_PRODUCT_STATUS } from "@/lib/util/product-visibility"
+import { useToast } from "@modules/common/context/toast-context"
 
 type NewProductFormProps = {
   collections: Collection[]
@@ -23,6 +24,7 @@ type NewProductFormProps = {
 }
 
 export default function NewProductForm({ collections, categories }: NewProductFormProps) {
+  const { showToast } = useToast()
   const [productType, setProductType] = useState<"single" | "variant">("single")
   const [variants, setVariants] = useState<VariantFormData[]>([])
   const [name, setName] = useState("")
@@ -37,6 +39,20 @@ export default function NewProductForm({ collections, categories }: NewProductFo
     { title: "Color", values: [] }
   ])
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null)
+
+  const [formState, formAction] = useActionState<
+    { success: boolean; error: string | null },
+    FormData
+  >(createProduct, {
+    success: false,
+    error: null,
+  })
+
+  useEffect(() => {
+    if (formState?.error) {
+      showToast(formState.error, "error", "Create Failed")
+    }
+  }, [formState?.error, showToast])
 
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,7 +147,7 @@ export default function NewProductForm({ collections, categories }: NewProductFo
   }
 
   return (
-    <form id="product-form" action={createProduct} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <form id="product-form" action={formAction} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Hidden input for variants JSON */}
       <input type="hidden" name="variants" value={JSON.stringify(productType === "variant" ? variants : [])} />
 
